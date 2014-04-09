@@ -135,5 +135,17 @@ public class TCP {
     public Socket socket(int port) {
         return new Socket(port);
     }
+    
+    /**
+     * encode data in a TCP packet, add header, calculate checksum and sent the
+     * packet through the IP layer
+     * @return -
+     * @param data bytes
+     * @param destination port
+     * @param destination IP
+     */
+    private void send_tcp_packet(){
+    	
+    }
 
 }
