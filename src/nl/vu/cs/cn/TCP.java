@@ -24,12 +24,18 @@ public class TCP {
     public class Socket {
 
     	/* Hint: You probably need some socket specific data. */
-
+    	IpAddress dst;
+		IpAddress src;
+		int port;
+		byte[] buf;
+		int offset;
+		int maxlen;
+		int len;
     	/**
     	 * Construct a client socket.
     	 */
     	private Socket() {
-
+    		
     	}
 
     	/**
@@ -38,8 +44,11 @@ public class TCP {
     	 * @param port the local port to use
     	 */
         private Socket(int port) {
-			// TODO Auto-generated constructor stub
-		}
+        	this.port = port;
+        	//TODO
+        	
+        
+        }
 
 		/**
          * Connect this socket to the specified destination and port.
@@ -224,8 +233,7 @@ public class TCP {
      */
     private void send_tcp_packet(int destination, int id, byte[] data,
     		int src_port, int dest_port, long seq_nr, long ack_nr,
-    		int ack, int syn, int fin
-    		){
+    		int ack, int syn, int fin){
     	
     	TCPHeader header = new TCPHeader(src_port, dest_port, seq_nr, ack_nr, ack, syn, fin);
     	byte[] headerbytes = header.toByteArray();
