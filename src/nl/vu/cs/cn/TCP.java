@@ -12,9 +12,6 @@ import nl.vu.cs.cn.IP.Packet;
  */
 public class TCP {
 
-	/** TCP header length (bytes) */
-	
-	
 	/** The underlying IP stack for this TCP stack. */
 	private IP ip;
 
@@ -153,18 +150,18 @@ public class TCP {
      * this class represents a TCP header
      */
     public class TCPHeader{
-    	int src_port, dest_port, data_offset;
+    	int src_port, dest_port;
     	int[] unused_flags = {0, 0, 0};
     	int ns, cwr, ece, urg, ack, psh, rst, syn, fin, window_size, checksum, urgent_pointer;
     	long seq_nr, ack_nr;
     	public static final int HEADER_LENGTH = 20;
+    	public static final byte DATA_OFFSET = 0x05;
     	
-    	public TCPHeader(int src_port, int dest_port, long seq_nr, long ack_nr,
+    	TCPHeader(int src_port, int dest_port, long seq_nr, long ack_nr,
     			int ack, int syn, int fin
     			){
     		
     		//set other flags unused by this implementation
-    		data_offset = 5;
     		cwr = 0; ece = 0; urg = 0; psh = 1; rst = 0; ns = 0; 
     		window_size = 1; urgent_pointer = 0;
     		
@@ -199,7 +196,7 @@ public class TCP {
     			result[i] = (byte) (ack_nr>>((i - 8) * 8));
     		}
     		//add flags
-    		result[12] = (byte) ((0x05 << 4) | (byte) ns); //unused 3 bits are 0
+    		result[12] = (byte) ((DATA_OFFSET << 4) | (byte) ns); //unused 3 bits are 0
     		result[13] = (byte) (((byte) (cwr <<7)) |
     				((byte) (ece <<6)) |
     				((byte) (urg <<5)) |
@@ -224,28 +221,27 @@ public class TCP {
     	}
     }
     /**
-     * encode data in a TCP packet, add header, calculate checksum and sent the
+     * encode data in a TCP packet, add header, calculate checksum and send the
      * packet through the IP layer
      * @return -
-     * @param data bytes
-     * @param destination port
      * @param destination IP
      * @param packet id
-     * @param something
+     * @param data bytes
+     * @param header
      */
     @SuppressWarnings("unused")
 	private void send_tcp_packet(int destination, int id, byte[] data, TCPHeader header){
     	
     	//encode header
     	byte[] headerbytes = header.toByteArray();
-    	
     	//TODO calculate checksum
     	
     	//add header and body to packet
     	byte[] tcpdata = new byte[data.length + TCPHeader.HEADER_LENGTH];
-    	int i = 0;
+    	    	
     	//add header to packet body
-    	for (; i < TCPHeader.HEADER_LENGTH; i++){
+    	int i;
+    	for (i = 0; i < TCPHeader.HEADER_LENGTH; i++){
     		tcpdata[i] = headerbytes[i]; 
     	}
     	//add data to packet header
@@ -268,5 +264,13 @@ public class TCP {
 			e.printStackTrace();
 		}
     }
-
+    
+    /**
+     * receives a packet
+     */
+    @SuppressWarnings("unused")
+    private void recv_tcp_packet(){
+    
+    
+    }
 }
