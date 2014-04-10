@@ -2,6 +2,7 @@ package nl.vu.cs.cn;
 
 import java.io.IOException;
 
+import android.util.Log;
 import nl.vu.cs.cn.IP.IpAddress;
 import nl.vu.cs.cn.IP.Packet;
 
@@ -12,7 +13,7 @@ import nl.vu.cs.cn.IP.Packet;
 public class TCP {
 
 	/** TCP header length (bytes) */
-	public static final int HEADER_LENGTH = 20;
+	
 	
 	/** The underlying IP stack for this TCP stack. */
 	private IP ip;
@@ -44,10 +45,7 @@ public class TCP {
     	 * @param port the local port to use
     	 */
         private Socket(int port) {
-        	this.port = port;
-        	//TODO
-        	
-        
+        	this.port = port;       
         }
 
 		/**
@@ -103,7 +101,10 @@ public class TCP {
         public int write(byte[] buf, int offset, int len) {
 
             // Write to the socket here.
-
+        	
+        	//TCPHeader header = new TCPHeader(src_port, dest_port, seq_nr, ack_nr, ack, syn, fin);
+        	
+        	
             return -1;
         }
 
@@ -156,7 +157,7 @@ public class TCP {
     	int[] unused_flags = {0, 0, 0};
     	int ns, cwr, ece, urg, ack, psh, rst, syn, fin, window_size, checksum, urgent_pointer;
     	long seq_nr, ack_nr;
-    	public static final int HEADER_LENGTH = TCP.HEADER_LENGTH;
+    	public static final int HEADER_LENGTH = 20;
     	
     	public TCPHeader(int src_port, int dest_port, long seq_nr, long ack_nr,
     			int ack, int syn, int fin
@@ -229,33 +230,43 @@ public class TCP {
      * @param data bytes
      * @param destination port
      * @param destination IP
+     * @param packet id
      * @param something
      */
-    private void send_tcp_packet(int destination, int id, byte[] data,
-    		int src_port, int dest_port, long seq_nr, long ack_nr,
-    		int ack, int syn, int fin){
+    @SuppressWarnings("unused")
+	private void send_tcp_packet(int destination, int id, byte[] data, TCPHeader header){
     	
-    	TCPHeader header = new TCPHeader(src_port, dest_port, seq_nr, ack_nr, ack, syn, fin);
+    	//encode header
     	byte[] headerbytes = header.toByteArray();
     	
     	//TODO calculate checksum
     	
-    	
-    	byte[] tcpdata = new byte[data.length + HEADER_LENGTH];
+    	//add header and body to packet
+    	byte[] tcpdata = new byte[data.length + TCPHeader.HEADER_LENGTH];
     	int i = 0;
-    	for (; i < HEADER_LENGTH; i++){
+    	//add header to packet body
+    	for (; i < TCPHeader.HEADER_LENGTH; i++){
     		tcpdata[i] = headerbytes[i]; 
     	}
-    	
+    	//add data to packet header
     	for(int j = 0; j < data.length; j++){
     		tcpdata[i] = data[j];
     		i++;
     	}
-    	//TODO calculate ip packet length
+    	//TODO calculate IP packet length
     	int length = 0;
     	
+    	//create new packet
     	Packet ip_packet = new Packet(destination, IP.TCP_PROTOCOL, id,
                 tcpdata, length);
+    	
+    	//send packet
+    	try {
+			ip.ip_send(ip_packet);
+		} catch (IOException e) {
+			Log.e("IPSendFail", "Failed sending IP packet", e);
+			e.printStackTrace();
+		}
     }
 
 }
