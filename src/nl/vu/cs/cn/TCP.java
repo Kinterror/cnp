@@ -149,7 +149,7 @@ public class TCP {
     /**
      * this class represents a TCP header
      */
-    public class TCPHeader{
+    public static class TCPHeader{
     	int src_port, dest_port;
     	int[] unused_flags = {0, 0, 0};
     	int ns, cwr, ece, urg, ack, psh, rst, syn, fin, window_size, checksum, urgent_pointer;
@@ -178,13 +178,20 @@ public class TCP {
     		this.fin = fin;
     	}
     	
-    	public byte[] toByteArray(){
+    	TCPHeader(int src_port, int dest_port, long seq_nr, long ack_nr,
+    			int ack, int syn, int fin, int checksum){
+    		this(src_port, dest_port, seq_nr, ack_nr,
+        			ack, syn, fin);
+    		this.checksum = checksum;
+    	}
+    	
+    	public byte[] encode(){
     		byte[] result = new byte[HEADER_LENGTH];
     		
     		//add source port
     		result[0] = (byte) (src_port>>8);
     		result[1] = (byte) src_port;
-        	//add dest port
+        	//add destination port
     		result[2] = (byte) (dest_port>>8);
     		result[3] = (byte) dest_port;
     		//add sequence number
@@ -219,6 +226,30 @@ public class TCP {
     		
     		return result;
     	}
+    	
+    	public static TCPHeader decode(byte[] array){
+    		int src_port = (((int) array[0]) <<8) | (int)array[1];
+    		
+    		int dest_port = (((int) array[2]) <<8) | (int)array[3];
+    		
+    		long seq_nr = 0, ack_nr = 0;
+    		for(int i = 4; i < 8; i++){
+    			seq_nr |= (long) (array[i]);
+    		}
+    		for(int i = 8; i < 12; i++){
+    			ack_nr |= (long) (array[i]);
+    		}
+    		
+    		//skip result[12]
+    		int ack = (int)((array[13] & 0x10) >>4);
+    		int syn = (int)((array[13] & 0x02) >>1);
+    		int fin = (int)(array[13] & 0x01);
+    		
+    		int checksum = (((int) array[16]) <<8) | ((int) array[17]);
+    		
+    		return new TCPHeader(src_port, dest_port, seq_nr, ack_nr,
+        			ack, syn, fin, checksum);
+    	}
     }
     /**
      * encode data in a TCP packet, add header, calculate checksum and send the
@@ -233,7 +264,7 @@ public class TCP {
 	private void send_tcp_packet(int destination, int id, byte[] data, TCPHeader header){
     	
     	//encode header
-    	byte[] headerbytes = header.toByteArray();
+    	byte[] headerbytes = header.encode();
     	//TODO calculate checksum
     	
     	//add header and body to packet
@@ -269,8 +300,49 @@ public class TCP {
      * receives a packet
      */
     @SuppressWarnings("unused")
-    private void recv_tcp_packet(){
-    
-    
+    private void recv_tcp_packet() throws CorruptedPacketException{
+    	Packet p = new Packet();
+    	try {
+			ip.ip_receive(p);
+			if(p.protocol != IP.TCP_PROTOCOL){
+				//not for me
+				return;
+			}
+			if(p.length < TCPHeader.HEADER_LENGTH){
+				throw new CorruptedPacketException("Packet too short");
+			}
+			
+			//extract header
+			byte[] headerBytes = new byte[TCPHeader.HEADER_LENGTH];
+			
+			int i;
+			for(i = 0; i < TCPHeader.HEADER_LENGTH; i++){
+				headerBytes[i] = p.data[i];
+			}
+			
+			//extract data
+			byte[] dataBytes = new byte[p.length - TCPHeader.HEADER_LENGTH];
+			for(; i < p.length; i++){
+				dataBytes[i - TCPHeader.HEADER_LENGTH] = p.data[i];
+			}
+			
+			//parse header
+			TCPHeader header = TCPHeader.decode(headerBytes);
+			
+			//TODO validate checksum
+			int checksum = header.checksum;
+			/*
+			 * if (computeChecksum(packet) != checksum){
+			 * 		throw new CorruptedPacketException("Invalid checksum");
+			 * }
+			 */
+			
+			//TODO check destination port and send to specific socket
+			
+		} catch (IOException e) {
+			Log.e("IPRcvFail", "Failed receiving IP packet", e);
+			e.printStackTrace();
+		}
+    	
     }
 }
