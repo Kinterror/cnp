@@ -157,31 +157,16 @@ public class TCP {
      * @param header
      */
     @SuppressWarnings("unused")
-	private void send_tcp_packet(int destination, int id, byte[] data, TCPHeader header){
+	private void send_tcp_packet(int destination, int id, TCPPacket p){
     	
-    	//encode header
-    	byte[] headerbytes = header.encode();
-    	//TODO calculate checksum
+    	//encode tcp packet
+    	byte[] bytes = p.encode();
+    	//TODO calculate and set checksum
     	
-    	//add header and body to packet
-    	byte[] tcpdata = new byte[data.length + TCPHeader.HEADER_LENGTH];
-    	    	
-    	//add header to packet body
-    	int i;
-    	for (i = 0; i < TCPHeader.HEADER_LENGTH; i++){
-    		tcpdata[i] = headerbytes[i]; 
-    	}
-    	//add data to packet header
-    	for(int j = 0; j < data.length; j++){
-    		tcpdata[i] = data[j];
-    		i++;
-    	}
-    	//TODO calculate IP packet length
-    	int length = 0;
     	
     	//create new packet
     	Packet ip_packet = new Packet(destination, IP.TCP_PROTOCOL, id,
-                tcpdata, length);
+    			bytes, bytes.length);
     	
     	//send packet
     	try {
@@ -193,7 +178,7 @@ public class TCP {
     }
     
     /**
-     * receives a packet
+     * receive a packet
      */
     @SuppressWarnings("unused")
     private void recv_tcp_packet() throws CorruptedPacketException{
@@ -204,29 +189,15 @@ public class TCP {
 				//not for me
 				return;
 			}
-			if(p.length < TCPHeader.HEADER_LENGTH){
+			if(p.length < TCPPacket.HEADER_LENGTH){
 				throw new CorruptedPacketException("Packet too short");
 			}
 			
-			//extract header
-			byte[] headerBytes = new byte[TCPHeader.HEADER_LENGTH];
-			
-			int i;
-			for(i = 0; i < TCPHeader.HEADER_LENGTH; i++){
-				headerBytes[i] = p.data[i];
-			}
-			
-			//extract data
-			byte[] dataBytes = new byte[p.length - TCPHeader.HEADER_LENGTH];
-			for(; i < p.length; i++){
-				dataBytes[i - TCPHeader.HEADER_LENGTH] = p.data[i];
-			}
-			
 			//parse header
-			TCPHeader header = TCPHeader.decode(headerBytes);
+			TCPPacket packet = TCPPacket.decode(p.data, p.length);
 			
 			//TODO validate checksum
-			int checksum = header.checksum;
+			int checksum = packet.checksum;
 			/*
 			 * if (computeChecksum(packet) != checksum){
 			 * 		throw new CorruptedPacketException("Invalid checksum");

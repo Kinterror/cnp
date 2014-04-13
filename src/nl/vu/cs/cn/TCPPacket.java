@@ -4,7 +4,7 @@ package nl.vu.cs.cn;
  * this class represents the TCP header fields and encode and decode operations
  */
 
-public class TCPHeader{
+public class TCPPacket{
 	int src_port, dest_port;
 	int[] unused_flags = {0, 0, 0};
 	int ns, cwr, ece, urg, ack, psh, rst, syn, fin, window_size, checksum, urgent_pointer;
@@ -12,8 +12,10 @@ public class TCPHeader{
 	public static final int HEADER_LENGTH = 20;
 	public static final byte DATA_OFFSET = 0x05;
 	
-	TCPHeader(int src_port, int dest_port, long seq_nr, long ack_nr,
-			int ack, int syn, int fin
+	byte[] data;
+	
+	TCPPacket(int src_port, int dest_port, long seq_nr, long ack_nr,
+			int ack, int syn, int fin, byte[] data
 			){
 		
 		//set other flags unused by this implementation
@@ -31,17 +33,18 @@ public class TCPHeader{
 		this.ack = ack;
 		this.syn = syn;
 		this.fin = fin;
+		this.data = data;
 	}
 	
-	TCPHeader(int src_port, int dest_port, long seq_nr, long ack_nr,
-			int ack, int syn, int fin, int checksum){
+	TCPPacket(int src_port, int dest_port, long seq_nr, long ack_nr,
+			int ack, int syn, int fin, byte[] data, int checksum){
 		this(src_port, dest_port, seq_nr, ack_nr,
-    			ack, syn, fin);
+    			ack, syn, fin, data);
 		this.checksum = checksum;
 	}
 	
 	public byte[] encode(){
-		byte[] result = new byte[HEADER_LENGTH];
+		byte[] result = new byte[HEADER_LENGTH + data.length];
 		
 		//add source port
 		result[0] = (byte) (src_port>>8);
@@ -79,10 +82,15 @@ public class TCPHeader{
 		result[18] = (byte) (urgent_pointer >>8);
 		result[19] = (byte) urgent_pointer;
 		
+		//copy data
+		for(int i = 0; i < data.length; i++){
+			result[i + HEADER_LENGTH] = data[i];
+		}
+		
 		return result;
 	}
 	
-	public static TCPHeader decode(byte[] array){
+	public static TCPPacket decode(byte[] array, int length){
 		int src_port = (((int) array[0]) <<8) | (int)array[1];
 		
 		int dest_port = (((int) array[2]) <<8) | (int)array[3];
@@ -102,7 +110,13 @@ public class TCPHeader{
 		
 		int checksum = (((int) array[16]) <<8) | ((int) array[17]);
 		
-		return new TCPHeader(src_port, dest_port, seq_nr, ack_nr,
-    			ack, syn, fin, checksum);
+		byte[] data = new byte[length];
+		for(int i = 0; i < data.length; i++){
+    		data[i] = array[i + HEADER_LENGTH];
+    		i++;
+    	}
+		
+		return new TCPPacket(src_port, dest_port, seq_nr, ack_nr,
+    			ack, syn, fin, data, checksum);
 	}
 }
