@@ -181,35 +181,36 @@ public class TCP {
      * receive a packet
      */
     @SuppressWarnings("unused")
-    private void recv_tcp_packet() throws CorruptedPacketException{
+    private TCPPacket recv_tcp_packet() throws CorruptedPacketException{
     	Packet p = new Packet();
     	try {
 			ip.ip_receive(p);
 			if(p.protocol != IP.TCP_PROTOCOL){
 				//not for me
-				return;
+				return null;
 			}
 			if(p.length < TCPPacket.HEADER_LENGTH){
 				throw new CorruptedPacketException("Packet too short");
 			}
 			
-			//parse header
+			//parse packet
 			TCPPacket packet = TCPPacket.decode(p.data, p.length);
 			
 			//TODO validate checksum
 			int checksum = packet.checksum;
 			/*
-			 * if (computeChecksum(packet) != checksum){
+			 * if (packet.computeChecksum() != checksum){
 			 * 		throw new CorruptedPacketException("Invalid checksum");
 			 * }
 			 */
 			
 			//TODO check destination port and send to specific socket
 			
+			return packet;
 		} catch (IOException e) {
-			Log.e("IPRcvFail", "Failed receiving IP packet", e);
+			Log.e("IP Receive Fail", "Failed receiving IP packet", e);
 			e.printStackTrace();
 		}
-    	
+    	return null;
     }
 }
