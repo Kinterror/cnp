@@ -119,4 +119,42 @@ public class TCPPacket{
 		return new TCPPacket(src_port, dest_port, seq_nr, ack_nr,
     			ack, syn, fin, data, checksum);
 	}
+	
+	int calculate_checksum(int source, int dest, int protocol){
+		int sum = 0;
+		
+		//add source address
+		sum += (source>>16) & 0xffff;
+		sum += (source & 0xffff);
+		
+		//add destination address
+		sum += (dest>>16) & 0xffff;
+		sum += (dest & 0xffff);
+		
+		//add protocol (and zeroes)
+		sum += protocol & 0xff;
+		
+		//add length
+		sum += (data.length + HEADER_LENGTH) & 0xffff;
+		
+		//add tcp header. For readability and making the computation of the checksum easier, we encode it here.
+		byte[] temp_array = encode();
+		
+		int i = 0;
+		int tcplen;
+		for(tcplen = temp_array.length; tcplen > 1; tcplen-=2){
+			sum += ((short)temp_array[i])<<8 | ((short)temp_array[i+1]);
+			i += 2;
+		}
+		if (tcplen > 0){
+			//add padding byte
+			sum += temp_array[i]<<8;
+		}
+		while(sum>>16 > 0){
+			sum += sum>>16;
+		}
+		
+		//one's complement
+		return ~sum;
+	}
 }

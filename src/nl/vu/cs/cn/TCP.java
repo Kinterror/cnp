@@ -158,16 +158,21 @@ public class TCP {
     @SuppressWarnings("unused")
 	private void send_tcp_packet(int destination, int id, TCPPacket p){
     	
+    	//calculate and set checksum
+    	int source = ip.getLocalAddress().getAddress();
+    	p.checksum = p.calculate_checksum(source, destination, IP.TCP_PROTOCOL);
+    	    	
     	//encode tcp packet
     	byte[] bytes = p.encode();
-    	//TODO calculate and set checksum
     	
-    	
+    	    	
     	//create new packet
     	Packet ip_packet = new Packet(destination, IP.TCP_PROTOCOL, id,
     			bytes, bytes.length);
+    	ip_packet.source = source;
     	
     	//send packet
+    	
     	try {
 			ip.ip_send(ip_packet);
 		} catch (IOException e) {
@@ -181,31 +186,27 @@ public class TCP {
      */
     @SuppressWarnings("unused")
     private TCPPacket recv_tcp_packet() throws CorruptedPacketException{
-    	Packet p = new Packet();
+    	Packet ip_packet = new Packet();
     	try {
-			ip.ip_receive(p);
-			if(p.protocol != IP.TCP_PROTOCOL){
+			ip.ip_receive(ip_packet);
+			if(ip_packet.protocol != IP.TCP_PROTOCOL){
 				//not for me
 				return null;
 			}
-			if(p.length < TCPPacket.HEADER_LENGTH){
+			if(ip_packet.length < TCPPacket.HEADER_LENGTH){
 				throw new CorruptedPacketException("Packet too short");
 			}
 			
 			//parse packet
-			TCPPacket packet = TCPPacket.decode(p.data, p.length);
+			TCPPacket tcp_packet = TCPPacket.decode(ip_packet.data, ip_packet.length);
 			
-			//TODO validate checksum
-			int checksum = packet.checksum;
-			/*
-			 * if (packet.computeChecksum() != checksum){
-			 * 		throw new CorruptedPacketException("Invalid checksum");
-			 * }
-			 */
+			//validate checksum
+			int checksum = tcp_packet.checksum;
 			
-			//TODO check destination port and send to specific socket
-			
-			return packet;
+			if (tcp_packet.calculate_checksum(ip_packet.source, ip_packet.destination, ip_packet.protocol) != checksum){
+				throw new CorruptedPacketException("Invalid checksum");
+			}
+			return tcp_packet;
 		} catch (IOException e) {
 			Log.e("IP Receive Fail", "Failed receiving IP packet", e);
 			e.printStackTrace();
