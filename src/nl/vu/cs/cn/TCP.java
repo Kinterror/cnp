@@ -153,8 +153,7 @@ public class TCP {
      * @return -
      * @param destination IP
      * @param packet id
-     * @param data bytes
-     * @param header
+     * @param packet
      */
     @SuppressWarnings("unused")
 	private void send_tcp_packet(int destination, int id, TCPPacket p){
