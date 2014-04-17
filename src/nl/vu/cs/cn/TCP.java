@@ -29,6 +29,7 @@ public class TCP {
 		int offset;
 		int maxlen;
 		int len;
+		
     	/**
     	 * Construct a client socket.
     	 */
@@ -137,6 +138,15 @@ public class TCP {
     public Socket socket() {
         return new Socket();
     }
+    
+    /**
+     * @return the IP address of the TCP stack
+     */
+    public String getIPAddress(){
+    	
+    	return this.ip.getLocalAddress().toString();
+    	
+    }
 
     /**
      * @return a new server socket for this stack bound to the given port
@@ -156,11 +166,11 @@ public class TCP {
      * @param packet
      */
     @SuppressWarnings("unused")
-	private void send_tcp_packet(int destination, int id, TCPPacket p){
+	public void send_tcp_packet(int id, TCPPacket p){
     	
     	//calculate and set checksum
     	int source = ip.getLocalAddress().getAddress();
-    	p.checksum = p.calculate_checksum(source, destination, IP.TCP_PROTOCOL);
+    	p.checksum = p.calculate_checksum(source, ip.getLocalAddress().getAddress(), IP.TCP_PROTOCOL);
     	    	
     	//encode tcp packet
     	byte[] bytes = p.encode();

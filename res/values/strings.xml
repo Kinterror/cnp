@@ -2,5 +2,10 @@
 <resources>
 
     <string name="app_name">CNPracticum Chat</string>
-
+	<string name="ok">OK</string>
+	<string name="ip_address_selection">Enter the last number of your IP address</string>
+	<string name="ip_address_src">Source\'s IP address:</string>
+	<string name="ip_address_dst">Destination\'s IP address:</string>
+	<string name="your_message">Enter your message to send &#8230;</string>
+	<string name="send">Send</string>
 </resources>

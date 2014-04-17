@@ -15,8 +15,7 @@ public class TCPPacket{
 	byte[] data;
 	
 	TCPPacket(int src_port, int dest_port, long seq_nr, long ack_nr,
-			int ack, int syn, int fin, byte[] data
-			){
+			int ack, int syn, int fin, byte[] data){
 		
 		//set other flags unused by this implementation
 		cwr = 0; ece = 0; urg = 0; psh = 1; rst = 0; ns = 0; 
