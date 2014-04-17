@@ -201,7 +201,7 @@ public class TCP {
 				//not for me
 				return null;
 			}
-			if(ip_packet.length < TCPPacket.HEADER_LENGTH){
+			if(ip_packet.length < TCPPacket.HEADER_LENGTH || ip_packet.data.length < TCPPacket.HEADER_LENGTH){
 				throw new CorruptedPacketException("Packet too short");
 			}
 			
