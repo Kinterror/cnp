@@ -165,8 +165,7 @@ public class TCP {
      * @param packet id
      * @param packet
      */
-    @SuppressWarnings("unused")
-	public void send_tcp_packet(int id, TCPPacket p){
+	public void send_tcp_packet(int destination, int id, TCPPacket p){
     	
     	//calculate and set checksum
     	int source = ip.getLocalAddress().getAddress();
@@ -194,8 +193,7 @@ public class TCP {
     /**
      * receive a packet
      */
-    @SuppressWarnings("unused")
-    private TCPPacket recv_tcp_packet() throws CorruptedPacketException{
+    public TCPPacket recv_tcp_packet() throws CorruptedPacketException{
     	Packet ip_packet = new Packet();
     	try {
 			ip.ip_receive(ip_packet);
