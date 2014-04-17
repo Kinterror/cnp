@@ -1,7 +1,5 @@
 package nl.vu.cs.cn;
 
-import nl.vu.cs.cn.IP.IpAddress;
-
 /**
  * this class represents the TCP header fields and encode and decode operations
  */
@@ -91,6 +89,12 @@ public class TCPPacket{
 		return result;
 	}
 	
+	/**
+	 * 
+	 * @param array
+	 * @param length of the array (might be smaller than array.length), which is at least HEADER_LENGTH
+	 * @return TCPpacket deserialized from array
+	 */
 	public static TCPPacket decode(byte[] array, int length){
 		int src_port = (((int) array[0]) <<8) | (int)array[1];
 		
@@ -111,7 +115,7 @@ public class TCPPacket{
 		
 		int checksum = (((int) array[16]) <<8) | ((int) array[17]);
 		
-		byte[] data = new byte[length];
+		byte[] data = new byte[length - HEADER_LENGTH];
 		for(int i = 0; i < data.length; i++){
     		data[i] = array[i + HEADER_LENGTH];
     		i++;
