@@ -2,6 +2,7 @@ package nl.vu.cs.cn;
 
 import java.io.IOException;
 
+import nl.vu.cs.cn.IP.IpAddress;
 import nl.vu.cs.cn.IP.Packet;
 import android.app.Activity;
 import android.os.Bundle;
@@ -71,8 +72,25 @@ public class Chat extends Activity implements OnClickListener{
 			byte[] data = message.getBytes();
 			Log.i("text message", message);
 			TCPPacket tcpPkt = new TCPPacket(IP.TCP_PROTOCOL, IP.TCP_PROTOCOL, 1, 1, 0, 0, 0, data);
-			tcpLayerSrc.send_tcp_packet(tcpLayerDest., id, p);
 			
+//			byte[] pkt = tcpPkt.encode();
+			
+			String tmpAddress = tcpLayerDest.getIPAddress();
+			IpAddress tmpIpAddress = IpAddress.getAddress(tmpAddress);
+			int tmpIntAddress = tmpIpAddress.getAddress();
+			
+//			Packet ipPkt = new Packet(tmpIntAddress, IP.TCP_PROTOCOL, 1, pkt, pkt.length);
+//			ipPkt.source = IpAddress.getAddress(tcpLayerSrc.getIPAddress()).getAddress();
+			
+			tcpLayerSrc.send_tcp_packet(tmpIntAddress, 1, tcpPkt);
+			
+			try {
+				TCPPacket received = tcpLayerDest.recv_tcp_packet();
+				Log.i("received tcp packet", received.toString());
+			} catch (CorruptedPacketException e) {
+				// TODO Auto-generated catch block
+				e.printStackTrace();
+			}
 			
 			break;
 		}
