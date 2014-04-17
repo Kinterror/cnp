@@ -32,7 +32,12 @@ public class TCPPacket{
 		this.ack = ack;
 		this.syn = syn;
 		this.fin = fin;
-		this.data = data;
+		this.data = new byte[data.length];
+		for(int i = 0; i < data.length; i++){
+			this.data[i] = data[i];
+		}
+		
+		
 	}
 	
 	TCPPacket(int src_port, int dest_port, long seq_nr, long ack_nr,
@@ -118,7 +123,6 @@ public class TCPPacket{
 		byte[] data = new byte[length - HEADER_LENGTH];
 		for(int i = 0; i < data.length; i++){
     		data[i] = array[i + HEADER_LENGTH];
-    		i++;
     	}
 		
 		return new TCPPacket(src_port, dest_port, seq_nr, ack_nr,
@@ -142,13 +146,20 @@ public class TCPPacket{
 		//add length
 		sum += (data.length + HEADER_LENGTH) & 0xffff;
 		
+		//temporarily write away the checksum field
+		int temp = checksum;
+		checksum = 0;
+		
 		//add tcp header. For readability and making the computation of the checksum easier, we encode it here.
 		byte[] temp_array = encode();
+		
+		//set back checksum field
+		checksum = temp;
 		
 		int i = 0;
 		int tcplen;
 		for(tcplen = temp_array.length; tcplen > 1; tcplen-=2){
-			sum += ((short)temp_array[i])<<8 | ((short)temp_array[i+1]);
+			sum += ((char)temp_array[i])<<8 | ((char)temp_array[i+1]);
 			i += 2;
 		}
 		if (tcplen > 0){
@@ -160,7 +171,7 @@ public class TCPPacket{
 		}
 		
 		//one's complement
-		return ~sum;
+		return (int) ~sum;
 	}
 	
 	private String arrayString() {

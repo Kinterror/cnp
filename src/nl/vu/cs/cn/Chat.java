@@ -70,6 +70,7 @@ public class Chat extends Activity implements OnClickListener{
 		case R.id.bSendMessage:
 			String message = messageToSend.getText().toString();
 			byte[] data = message.getBytes();
+			Log.i("data bytes", Byte.toString(data[0]) + Byte.toString(data[1]));
 			Log.i("text message", message);
 			TCPPacket tcpPkt = new TCPPacket(IP.TCP_PROTOCOL, IP.TCP_PROTOCOL, 1, 1, 0, 0, 0, data);
 			
@@ -81,6 +82,8 @@ public class Chat extends Activity implements OnClickListener{
 			
 //			Packet ipPkt = new Packet(tmpIntAddress, IP.TCP_PROTOCOL, 1, pkt, pkt.length);
 //			ipPkt.source = IpAddress.getAddress(tcpLayerSrc.getIPAddress()).getAddress();
+			Log.i("packet before sending", tcpPkt.toString());
+			
 			
 			tcpLayerSrc.send_tcp_packet(tmpIntAddress, 1, tcpPkt);
 			
