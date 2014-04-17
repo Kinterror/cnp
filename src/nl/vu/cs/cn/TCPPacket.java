@@ -1,5 +1,7 @@
 package nl.vu.cs.cn;
 
+import nl.vu.cs.cn.IP.IpAddress;
+
 /**
  * this class represents the TCP header fields and encode and decode operations
  */
@@ -155,5 +157,31 @@ public class TCPPacket{
 		
 		//one's complement
 		return ~sum;
+	}
+	
+	private String arrayString() {
+    	StringBuffer dataString = new StringBuffer("[");
+    	for (int i = 0; i < data.length; i++) {
+    		if (i > 0) {
+        		dataString.append(",");
+    		}
+    		dataString.append(data[i]);
+    	}
+    	dataString.append("]");
+    	return dataString.toString();
+    }
+	
+	public String toString(){
+//		int src_port, dest_port;
+//		int[] unused_flags = {0, 0, 0};
+//		int ns, cwr, ece, urg, ack, psh, rst, syn, fin, window_size, checksum, urgent_pointer;
+//		long seq_nr, ack_nr;
+//		public static final int HEADER_LENGTH = 20;
+//		public static final byte DATA_OFFSET = 0x05;
+		
+		return "Source port: " + src_port + " Dest port: " + dest_port + " ack: "
+                + ack + " syn: " + syn + " fin: " + fin
+                + " checksum: " + checksum + " seqnr: " + seq_nr + " acknr: " + ack_nr + " header length: " 
+                + HEADER_LENGTH + " data: " + arrayString();
 	}
 }
