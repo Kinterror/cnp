@@ -82,13 +82,15 @@ public class Chat extends Activity implements OnClickListener{
 //			Packet ipPkt = new Packet(tmpIntAddress, IP.TCP_PROTOCOL, 1, pkt, pkt.length);
 			int sourceAddr = IpAddress.getAddress(tcpLayerSrc.getIPAddress()).getAddress();
 			Log.i("packet before sending", tcpPkt.toString());
-			Log.i("checksum before sending", "" + tcpPkt.calculate_checksum(sourceAddr, tmpIntAddress, IP.TCP_PROTOCOL));
+			Log.i("checksum before sending", Integer.toString(tcpPkt.calculate_checksum(sourceAddr, tmpIntAddress, IP.TCP_PROTOCOL)));
 			
 			tcpLayerSrc.send_tcp_packet(tmpIntAddress, 1, tcpPkt);
 			
 			try {
 				TCPPacket received = tcpLayerDest.recv_tcp_packet();
 				Log.i("received tcp packet", received.toString());
+				Log.i("checksum after sending", Integer.toString(received.calculate_checksum(sourceAddr, tmpIntAddress, IP.TCP_PROTOCOL)));
+				
 			} catch (CorruptedPacketException e) {
 				// TODO Auto-generated catch block
 				e.printStackTrace();

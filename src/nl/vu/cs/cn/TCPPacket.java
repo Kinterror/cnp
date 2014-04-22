@@ -7,7 +7,8 @@ package nl.vu.cs.cn;
 public class TCPPacket{
 	int src_port, dest_port;
 	int[] unused_flags = {0, 0, 0};
-	int ns, cwr, ece, urg, ack, psh, rst, syn, fin, window_size, checksum, urgent_pointer;
+	int ns, cwr, ece, urg, ack, psh, rst, syn, fin, window_size, urgent_pointer;
+	short checksum;
 	long seq_nr, ack_nr;
 	public static final int HEADER_LENGTH = 20;
 	public static final byte DATA_OFFSET = 0x05;
@@ -41,7 +42,7 @@ public class TCPPacket{
 	}
 	
 	TCPPacket(int src_port, int dest_port, long seq_nr, long ack_nr,
-			int ack, int syn, int fin, byte[] data, int checksum){
+			int ack, int syn, int fin, byte[] data, short checksum){
 		this(src_port, dest_port, seq_nr, ack_nr,
     			ack, syn, fin, data);
 		this.checksum = checksum;
@@ -118,7 +119,13 @@ public class TCPPacket{
 		int syn = (int)((array[13] & 0x02) >>1);
 		int fin = (int)(array[13] & 0x01);
 		
-		int checksum = (((int) array[16]) <<8) | ((int) array[17]);
+		//left part of checksum, useful for debugging (Java Signedness is bothersome)
+		int c1 = ((int) array[16]) & 0x000000FF;
+		//right part
+		int c2 = ((int) array[17]) & 0x000000FF;
+		//add them together in a short
+		short checksum = (short) (c1 <<8 | c2);
+		
 		
 		byte[] data = new byte[length - HEADER_LENGTH];
 		for(int i = 0; i < data.length; i++){
@@ -129,7 +136,7 @@ public class TCPPacket{
     			ack, syn, fin, data, checksum);
 	}
 	
-	int calculate_checksum(int source, int dest, int protocol){
+	short calculate_checksum(int source, int dest, int protocol){
 		int sum = 0;
 		
 		//add source address
@@ -147,7 +154,7 @@ public class TCPPacket{
 		sum += (data.length + HEADER_LENGTH) & 0xffff;
 		
 		//temporarily write away the checksum field
-		int temp = checksum;
+		short temp = checksum;
 		checksum = 0;
 		
 		//add tcp header. For readability and making the computation of the checksum easier, we encode it here.
@@ -163,15 +170,15 @@ public class TCPPacket{
 			i += 2;
 		}
 		if (tcplen > 0){
-			//add padding byte
+			//add zero padding byte
 			sum += temp_array[i]<<8;
 		}
-		while(sum>>16 > 0){
-			sum += sum>>16;
+		while(sum>>16 != 0){
+			sum = sum>>16 + (sum & 0x0000FFFF);
 		}
 		
 		//one's complement
-		return (int) ~sum;
+		return (short) ~sum;
 	}
 	
 	private String arrayString() {
