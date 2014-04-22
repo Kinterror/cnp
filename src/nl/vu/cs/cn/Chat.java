@@ -69,7 +69,6 @@ public class Chat extends Activity implements OnClickListener{
 		case R.id.bSendMessage:
 			String message = messageToSend.getText().toString();
 			byte[] data = message.getBytes();
-			Log.i("data bytes", Byte.toString(data[0]) + Byte.toString(data[1]));
 			Log.i("text message", message);
 			TCPPacket tcpPkt = new TCPPacket(1024, 1024, 1, 1, 0, 0, 0, data);
 			

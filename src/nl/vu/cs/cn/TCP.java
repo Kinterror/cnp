@@ -201,6 +201,7 @@ public class TCP {
 				//not for me
 				return null;
 			}
+			//packet is too short to parse
 			if(ip_packet.length < TCPPacket.HEADER_LENGTH || ip_packet.data.length < TCPPacket.HEADER_LENGTH){
 				throw new CorruptedPacketException("Packet too short");
 			}
@@ -212,8 +213,10 @@ public class TCP {
 			int checksum = tcp_packet.checksum;
 			int calculated_checksum = tcp_packet.calculate_checksum(ip_packet.source, ip_packet.destination, ip_packet.protocol);
 			if (calculated_checksum != checksum){
-				//throw new CorruptedPacketException("Invalid checksum. Expected: " + calculated_checksum + " Received: " + checksum);
+				//packet was corrupted because checksum is not correct
+				throw new CorruptedPacketException("Invalid checksum. Expected: " + calculated_checksum + " Received: " + checksum);
 			}
+			
 			return tcp_packet;
 		} catch (IOException e) {
 			Log.e("IP Receive Fail", "Failed receiving IP packet", e);

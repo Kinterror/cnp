@@ -151,7 +151,8 @@ public class TCPPacket{
 		sum += protocol & 0xff;
 		
 		//add length
-		sum += (data.length + HEADER_LENGTH) & 0xffff;
+		int length = (data.length + HEADER_LENGTH);
+		sum += length & 0xffff;
 		
 		//temporarily write away the checksum field
 		short temp = checksum;
@@ -174,7 +175,7 @@ public class TCPPacket{
 			sum += temp_array[i]<<8;
 		}
 		while(sum>>16 != 0){
-			sum = sum>>16 + (sum & 0x0000FFFF);
+			sum = (sum>>16) + (sum & 0x0000FFFF);
 		}
 		
 		//one's complement
