@@ -3,7 +3,6 @@ package nl.vu.cs.cn;
 import java.io.IOException;
 
 import nl.vu.cs.cn.IP.IpAddress;
-import nl.vu.cs.cn.IP.Packet;
 import android.app.Activity;
 import android.os.Bundle;
 import android.util.Log;
@@ -72,7 +71,7 @@ public class Chat extends Activity implements OnClickListener{
 			byte[] data = message.getBytes();
 			Log.i("data bytes", Byte.toString(data[0]) + Byte.toString(data[1]));
 			Log.i("text message", message);
-			TCPPacket tcpPkt = new TCPPacket(IP.TCP_PROTOCOL, IP.TCP_PROTOCOL, 1, 1, 0, 0, 0, data);
+			TCPPacket tcpPkt = new TCPPacket(1024, 1024, 1, 1, 0, 0, 0, data);
 			
 //			byte[] pkt = tcpPkt.encode();
 			
@@ -81,9 +80,9 @@ public class Chat extends Activity implements OnClickListener{
 			int tmpIntAddress = tmpIpAddress.getAddress();
 			
 //			Packet ipPkt = new Packet(tmpIntAddress, IP.TCP_PROTOCOL, 1, pkt, pkt.length);
-//			ipPkt.source = IpAddress.getAddress(tcpLayerSrc.getIPAddress()).getAddress();
+			int sourceAddr = IpAddress.getAddress(tcpLayerSrc.getIPAddress()).getAddress();
 			Log.i("packet before sending", tcpPkt.toString());
-			
+			Log.i("checksum before sending", "" + tcpPkt.calculate_checksum(sourceAddr, tmpIntAddress, IP.TCP_PROTOCOL));
 			
 			tcpLayerSrc.send_tcp_packet(tmpIntAddress, 1, tcpPkt);
 			
