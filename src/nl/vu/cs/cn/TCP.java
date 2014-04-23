@@ -190,38 +190,53 @@ public class TCP {
 		}
     }
     
-    /**
+	/**
      * receive a packet
+	 * @throws InterruptedException
+	 * @throws CorruptedPacketException
      */
-    public TCPPacket recv_tcp_packet() throws CorruptedPacketException{
+	public TCPPacket recv_tcp_packet() throws CorruptedPacketException{
+		TCPPacket packet = null;
+		try {
+			packet = recv_tcp_packet(0);
+		} catch (InterruptedException e) {
+			// never happens since there is no timeout
+		}
+		return packet;
+	}
+	
+    public TCPPacket recv_tcp_packet(int timeout) throws CorruptedPacketException, InterruptedException{
     	Packet ip_packet = new Packet();
     	try {
-			ip.ip_receive(ip_packet);
-			if(ip_packet.protocol != IP.TCP_PROTOCOL){
-				//not for me
-				return null;
-			}
-			//packet is too short to parse
-			if(ip_packet.length < TCPPacket.HEADER_LENGTH || ip_packet.data.length < TCPPacket.HEADER_LENGTH){
-				throw new CorruptedPacketException("Packet too short");
-			}
-			
-			//parse packet
-			TCPPacket tcp_packet = TCPPacket.decode(ip_packet.data, ip_packet.length);
-			
-			//validate checksum
-			int checksum = tcp_packet.checksum;
-			int calculated_checksum = tcp_packet.calculate_checksum(ip_packet.source, ip_packet.destination, ip_packet.protocol);
-			if (calculated_checksum != checksum){
-				//packet was corrupted because checksum is not correct
-				throw new CorruptedPacketException("Invalid checksum. Expected: " + calculated_checksum + " Received: " + checksum);
-			}
-			
-			return tcp_packet;
-		} catch (IOException e) {
+	    	if(timeout > 0){
+	    		ip.ip_receive_timeout(ip_packet, timeout);
+	    	} else {
+		    	ip.ip_receive(ip_packet);			
+	    	}
+    	} catch (IOException e) {
 			Log.e("IP Receive Fail", "Failed receiving IP packet", e);
 			e.printStackTrace();
 		}
-    	return null;
+    	if(ip_packet.protocol != IP.TCP_PROTOCOL){
+			//not for me
+			return null;
+		}
+		//packet is too short to parse
+		if(ip_packet.length < TCPPacket.HEADER_LENGTH || ip_packet.data.length < TCPPacket.HEADER_LENGTH){
+			throw new CorruptedPacketException("Packet too short");
+		}
+		
+		//parse packet
+		TCPPacket tcp_packet = TCPPacket.decode(ip_packet.data, ip_packet.length);
+		
+		//validate checksum
+		int checksum = tcp_packet.checksum;
+		int calculated_checksum = tcp_packet.calculate_checksum(ip_packet.source, ip_packet.destination, ip_packet.protocol);
+		if (calculated_checksum != checksum){
+			//packet was corrupted because checksum is not correct
+			throw new CorruptedPacketException("Invalid checksum. Expected: " + calculated_checksum + " Received: " + checksum);
+		}
+		
+		return tcp_packet;
     }
 }
