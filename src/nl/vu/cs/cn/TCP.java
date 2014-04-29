@@ -3,18 +3,31 @@ package nl.vu.cs.cn;
 import java.io.IOException;
 
 import android.util.Log;
-import nl.vu.cs.cn.IP.IpAddress;
-import nl.vu.cs.cn.IP.Packet;
+import nl.vu.cs.cn.IP.*;
+import nl.vu.cs.cn.TcpControlBlock.ConnectionState;
 
 /**
  * This class represents a TCP stack. It should be built on top of the IP stack
  * which is bound to a given IP address.
  */
 public class TCP {
+	
+	/** The port a client socket will bind to automatically */
+	public static final int defaultClientPort = 12345;
+	
+	/** the ip address used to indicate a server accepts connections from any IP addresses*/
+	public static final IpAddress INADDR_ANY = IpAddress.getAddress(0);
 
 	/** The underlying IP stack for this TCP stack. */
 	private IP ip;
 
+	
+	
+	
+	
+	/**packet ID which is initially zero and is incremented each time a packet is sent through the IP layer*/
+	int ip_packet_id;
+	
     /**
      * This class represents a TCP socket.
      *
@@ -22,19 +35,14 @@ public class TCP {
     public class Socket {
 
     	/* Hint: You probably need some socket specific data. */
-    	IpAddress dst;
-		IpAddress src;
-		int port;
-		byte[] buf;
-		int offset;
-		int maxlen;
-		int len;
+    			
+		TcpControlBlock tcb;
 		
     	/**
     	 * Construct a client socket.
     	 */
     	private Socket() {
-    		
+    		this(defaultClientPort);
     	}
 
     	/**
@@ -43,7 +51,8 @@ public class TCP {
     	 * @param port the local port to use
     	 */
         private Socket(int port) {
-        	this.port = port;       
+        	tcb = new TcpControlBlock();
+        	tcb.bind(INADDR_ANY, port);
         }
 
 		/**
@@ -56,19 +65,31 @@ public class TCP {
         public boolean connect(IpAddress dst, int port) {
 
             // Implement the connection side of the three-way handshake here.
-        	ip.getLocalAddress();
-
-            return false;
-        }
+        	tcb.their_port = port;
+        	tcb.their_ip_addr = dst;
+        	
+        	
+        	return false;
+        }	
 
         /**
          * Accept a connection on this socket.
          * This call blocks until a connection is made.
          */
         public void accept() {
-
-            // Implement the receive side of the three-way handshake here.
-
+        	
+        	tcb.setState(ConnectionState.S_LISTEN);
+            try {
+            	//receive a packet from the network
+				TCPPacket syn_pck = recv_tcp_packet();
+				tcb.their_port = syn_pck.src_port;
+				//do stuff
+			} catch (CorruptedPacketException e) {
+				//wait for packet to arrive again.
+				
+			}
+        	// Implement the receive side of the three-way handshake here.
+            
         }
 
         /**
@@ -82,9 +103,11 @@ public class TCP {
          * @return the number of bytes read, or -1 if an error occurs.
          */
         public int read(byte[] buf, int offset, int maxlen) {
-
+//        	if(block.state != ConnectionState.S_ESTABLISHED){
+//        		return -1;
+//        	}
             // Read from the socket here.
-
+        	
             return -1;
         }
 
@@ -97,7 +120,9 @@ public class TCP {
          * @return the number of bytes written or -1 if an error occurs.
          */
         public int write(byte[] buf, int offset, int len) {
-
+        	if(tcb.getState() != ConnectionState.S_ESTABLISHED){
+        		return -1;
+        	}
             // Write to the socket here.
         	
         	//TCPHeader header = new TCPHeader(src_port, dest_port, seq_nr, ack_nr, ack, syn, fin);
@@ -130,6 +155,7 @@ public class TCP {
      */
     public TCP(int address) throws IOException {
         ip = new IP(address);
+        ip_packet_id = 0;
     }
 
     /**
@@ -164,35 +190,32 @@ public class TCP {
      * @param destination IP
      * @param packet id
      * @param packet
+     * @throws IOException 
      */
-	public void send_tcp_packet(int destination, int id, TCPPacket p){
-    	
+	public void send_tcp_packet(IpAddress destination, TCPPacket p) throws IOException{
+    	//get integer value of IPAddress
+		int destIpInt = destination.getAddress();
+		
     	//calculate and set checksum
     	int source = ip.getLocalAddress().getAddress();
-    	p.checksum = p.calculate_checksum(source, destination, IP.TCP_PROTOCOL);
+    	p.checksum = p.calculate_checksum(source, destIpInt, IP.TCP_PROTOCOL);
     	    	
     	//encode tcp packet
     	byte[] bytes = p.encode();
     	
     	    	
-    	//create new packet
-    	Packet ip_packet = new Packet(destination, IP.TCP_PROTOCOL, id,
+    	//create new packet and increment ID counter
+    	Packet ip_packet = new Packet(destIpInt, IP.TCP_PROTOCOL, ip_packet_id++,
     			bytes, bytes.length);
     	ip_packet.source = source;
     	
     	//send packet
-    	
-    	try {
-			ip.ip_send(ip_packet);
-		} catch (IOException e) {
-			Log.e("IPSendFail", "Failed sending IP packet", e);
-			e.printStackTrace();
-		}
+    	ip.ip_send(ip_packet);
+		
     }
     
 	/**
      * receive a packet
-	 * @throws InterruptedException
 	 * @throws CorruptedPacketException
      */
 	public TCPPacket recv_tcp_packet() throws CorruptedPacketException{
@@ -204,7 +227,11 @@ public class TCP {
 		}
 		return packet;
 	}
-	
+	/**
+     * receive a packet within a given time
+	 * @throws InterruptedException
+	 * @throws CorruptedPacketException
+     */
     public TCPPacket recv_tcp_packet(int timeout) throws CorruptedPacketException, InterruptedException{
     	Packet ip_packet = new Packet();
     	try {
@@ -222,7 +249,8 @@ public class TCP {
 			return null;
 		}
 		//packet is too short to parse
-		if(ip_packet.length < TCPPacket.HEADER_LENGTH || ip_packet.data.length < TCPPacket.HEADER_LENGTH){
+		if(ip_packet.length < TCPPacket.HEADER_LENGTH || ip_packet.data.length < TCPPacket.HEADER_LENGTH 
+				|| ip_packet.data.length < ip_packet.length){
 			throw new CorruptedPacketException("Packet too short");
 		}
 		
