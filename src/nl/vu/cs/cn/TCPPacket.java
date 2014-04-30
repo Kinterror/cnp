@@ -196,6 +196,17 @@ public class TCPPacket{
 		return (short) ~sum;
 	}
 	
+	/**
+	 * Compare two checksums to see if they match.
+	 * 
+	 * @param source
+	 * @param dest
+	 * @return true if the checksums match
+	 */
+	public boolean validateChecksum(int source, int dest){
+		return (checksum == calculate_checksum(source, dest, IP.TCP_PROTOCOL));
+	}
+	
 	
 	/**
 	 * Convert the data byte array of a TCP segment into a String object.
