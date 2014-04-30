@@ -182,6 +182,10 @@ public class TCPPacket{
 		return (short) ~sum;
 	}
 	
+	public boolean validateChecksum(int source, int dest){
+		return (checksum == calculate_checksum(source, dest, IP.TCP_PROTOCOL));
+	}
+	
 	private String arrayString() {
     	StringBuffer dataString = new StringBuffer("[");
     	for (int i = 0; i < data.length; i++) {

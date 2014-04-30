@@ -219,16 +219,17 @@ public class TCP {
 	 * @throws CorruptedPacketException
      */
 	public TCPPacket recv_tcp_packet() throws CorruptedPacketException{
-		TCPPacket packet = null;
 		try {
-			packet = recv_tcp_packet(0);
+			return recv_tcp_packet(0);
 		} catch (InterruptedException e) {
 			// never happens since there is no timeout
+			return null;
 		}
-		return packet;
+		
 	}
 	/**
      * receive a packet within a given time
+     * @param timeout the timeout (seconds) to wait for a packet. If set to a value <= 0, it waits indefinitely.
 	 * @throws InterruptedException
 	 * @throws CorruptedPacketException
      */
@@ -243,6 +244,7 @@ public class TCP {
     	} catch (IOException e) {
 			Log.e("IP Receive Fail", "Failed receiving IP packet", e);
 			e.printStackTrace();
+			return null;
 		}
     	if(ip_packet.protocol != IP.TCP_PROTOCOL){
 			//not for me
@@ -258,11 +260,9 @@ public class TCP {
 		TCPPacket tcp_packet = TCPPacket.decode(ip_packet.data, ip_packet.length);
 		
 		//validate checksum
-		int checksum = tcp_packet.checksum;
-		int calculated_checksum = tcp_packet.calculate_checksum(ip_packet.source, ip_packet.destination, ip_packet.protocol);
-		if (calculated_checksum != checksum){
+		if (!tcp_packet.validateChecksum(ip_packet.source, ip_packet.destination)){
 			//packet was corrupted because checksum is not correct
-			throw new CorruptedPacketException("Invalid checksum. Expected: " + calculated_checksum + " Received: " + checksum);
+			throw new CorruptedPacketException("Invalid checksum");
 		}
 		
 		return tcp_packet;
