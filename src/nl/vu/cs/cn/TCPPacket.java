@@ -48,6 +48,11 @@ public class TCPPacket{
 		this.checksum = checksum;
 	}
 	
+	/**
+	 * Encode a TCP segment into a byte array.
+	 * 
+	 * @return the byte array
+	 */
 	public byte[] encode(){
 		byte[] result = new byte[HEADER_LENGTH + data.length];
 		
@@ -96,6 +101,7 @@ public class TCPPacket{
 	}
 	
 	/**
+	 * Decode a byte array representing a TCP segment.
 	 * 
 	 * @param array
 	 * @param length of the array (might be smaller than array.length), which is at least HEADER_LENGTH
@@ -136,6 +142,15 @@ public class TCPPacket{
     			ack, syn, fin, data, checksum);
 	}
 	
+	
+	/**
+	 * Compute the checksum of a TCP segment. 
+	 * 
+	 * @param source
+	 * @param dest
+	 * @param protocol
+	 * @return the checksum
+	 */
 	short calculate_checksum(int source, int dest, int protocol){
 		int sum = 0;
 		
@@ -151,8 +166,7 @@ public class TCPPacket{
 		sum += protocol & 0xff;
 		
 		//add length
-		int length = (data.length + HEADER_LENGTH);
-		sum += length & 0xffff;
+		sum += (data.length + HEADER_LENGTH) & 0xffff;
 		
 		//temporarily write away the checksum field
 		short temp = checksum;
@@ -182,6 +196,12 @@ public class TCPPacket{
 		return (short) ~sum;
 	}
 	
+	
+	/**
+	 * Convert the data byte array of a TCP segment into a String object.
+	 * 
+	 * @return the string object representing the data.
+	 */
 	private String arrayString() {
     	StringBuffer dataString = new StringBuffer("[");
     	for (int i = 0; i < data.length; i++) {
@@ -193,15 +213,14 @@ public class TCPPacket{
     	dataString.append("]");
     	return dataString.toString();
     }
+
 	
+	/**
+	 * Convert a TCP segment (header and data) into a String object.
+	 * 
+	 * @return the string object 
+	 */
 	public String toString(){
-//		int src_port, dest_port;
-//		int[] unused_flags = {0, 0, 0};
-//		int ns, cwr, ece, urg, ack, psh, rst, syn, fin, window_size, checksum, urgent_pointer;
-//		long seq_nr, ack_nr;
-//		public static final int HEADER_LENGTH = 20;
-//		public static final byte DATA_OFFSET = 0x05;
-		
 		return "Source port: " + src_port + " Dest port: " + dest_port + " ack: "
                 + ack + " syn: " + syn + " fin: " + fin
                 + " checksum: " + checksum + " seqnr: " + seq_nr + " acknr: " + ack_nr + " header length: " 
