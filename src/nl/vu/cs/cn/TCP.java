@@ -81,7 +81,7 @@ public class TCP {
         	tcb.setState(ConnectionState.S_LISTEN);
             try {
             	//receive a packet from the network
-				TCPSegment syn_pck = recv_tcp_packet();
+				TCPSegment syn_pck = recv_tcp_segment();
 				//update connection source
 				tcb.setSource(syn_pck);
 				//do stuff
@@ -193,7 +193,7 @@ public class TCP {
      * @param packet
      * @throws IOException 
      */
-	public void send_tcp_packet(IpAddress destination, TCPSegment p) throws IOException{
+	public void send_tcp_segment(IpAddress destination, TCPSegment p) throws IOException{
     	//get integer value of IPAddress
 		int destIpInt = destination.getAddress();
 		
@@ -219,9 +219,9 @@ public class TCP {
      * receive a packet
 	 * @throws CorruptedPacketException
      */
-	public TCPSegment recv_tcp_packet() throws CorruptedPacketException{
+	public TCPSegment recv_tcp_segment() throws CorruptedPacketException{
 		try {
-			return recv_tcp_packet(0);
+			return recv_tcp_segment(0);
 		} catch (InterruptedException e) {
 			// never happens since there is no timeout
 			return null;
@@ -234,7 +234,7 @@ public class TCP {
 	 * @throws InterruptedException
 	 * @throws CorruptedPacketException
      */
-    public TCPSegment recv_tcp_packet(int timeout) throws CorruptedPacketException, InterruptedException{
+    public TCPSegment recv_tcp_segment(int timeout) throws CorruptedPacketException, InterruptedException{
     	Packet ip_packet = new Packet();
     	try {
 	    	if(timeout > 0){

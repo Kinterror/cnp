@@ -25,7 +25,7 @@ public class TCPSegment{
 	public static final int HEADER_LENGTH = 20;
 	int source_ip;
 	
-	//constructor for a packet without specified checksum
+	//constructor for a segment without specified checksum
 	TCPSegment(int src_port, int dest_port, long seq_nr, long ack_nr,
 			int ack, int syn, int fin, byte[] data){
 		
@@ -74,7 +74,7 @@ public class TCPSegment{
     	//add destination port
 		result[2] = (byte) (dest_port>>8);
 		result[3] = (byte) dest_port;
-		//add sequence number
+		//add sequence nusegmentmber
 		for(int i = 4; i < 8; i++){
 			result[i] = (byte) (seq_nr>>((i - 4) * 8));
 		}
@@ -117,7 +117,7 @@ public class TCPSegment{
 	 * 
 	 * @param array
 	 * @param length of the array (might be smaller than array.length), which is at least HEADER_LENGTH
-	 * @return TCPpacket deserialized from array
+	 * @return TCPSegment deserialized from array
 	 */
 	public static TCPSegment decode(byte[] array, int length){
 		int src_port = (((int) array[0]) <<8) | (int)array[1];
