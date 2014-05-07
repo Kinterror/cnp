@@ -3,7 +3,7 @@ package nl.vu.cs.cn;
 import nl.vu.cs.cn.IP.IpAddress;
 
 /**definition of the Connection states*/
-class TcpControlBlock{
+class TCPControlBlock{
 	
 	public enum ConnectionState
 	{
@@ -22,7 +22,7 @@ class TcpControlBlock{
 	int our_expected_ack;
 	byte tcb_data[];
 	
-	TcpControlBlock(){
+	TCPControlBlock(){
 		state = ConnectionState.S_CLOSED;
 		tcb_data = new byte[TCB_BUF_SIZE];
 		//our_sequence_num = generate_seqnr();
@@ -43,5 +43,10 @@ class TcpControlBlock{
 	
 	ConnectionState getState(){
 		return state;
+	}
+	
+	void setSource(TCPSegment p){
+		their_port = p.src_port;
+		their_ip_addr = IpAddress.getAddress(p.source_ip);
 	}
 }

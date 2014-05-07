@@ -4,18 +4,29 @@ package nl.vu.cs.cn;
  * this class represents the TCP header fields and encode and decode operations
  */
 
-public class TCPPacket{
+public class TCPSegment{
+	//ports
 	int src_port, dest_port;
+	//unused flags. See RFC 793 for more details.
+	//these fields' semantics are not supported in this implementation. They exist just for the sake of completeness.
 	int[] unused_flags = {0, 0, 0};
-	int ns, cwr, ece, urg, ack, psh, rst, syn, fin, window_size, urgent_pointer;
+	int ns, cwr, ece, urg, rst;
+	int window_size, urgent_pointer;
+	//used flags.
+	int ack, psh, syn, fin;
 	short checksum;
+	//sequence numbers
 	long seq_nr, ack_nr;
-	public static final int HEADER_LENGTH = 20;
 	public static final byte DATA_OFFSET = 0x05;
 	
 	byte[] data;
 	
-	TCPPacket(int src_port, int dest_port, long seq_nr, long ack_nr,
+	//these fields are not formally a part of the TCP header; however, in our implementation they are used. 
+	public static final int HEADER_LENGTH = 20;
+	int source_ip;
+	
+	//constructor for a packet without specified checksum
+	TCPSegment(int src_port, int dest_port, long seq_nr, long ack_nr,
 			int ack, int syn, int fin, byte[] data){
 		
 		//set other flags unused by this implementation
@@ -41,7 +52,8 @@ public class TCPPacket{
 		
 	}
 	
-	TCPPacket(int src_port, int dest_port, long seq_nr, long ack_nr,
+	//constructor with checksum
+	TCPSegment(int src_port, int dest_port, long seq_nr, long ack_nr,
 			int ack, int syn, int fin, byte[] data, short checksum){
 		this(src_port, dest_port, seq_nr, ack_nr,
     			ack, syn, fin, data);
@@ -107,7 +119,7 @@ public class TCPPacket{
 	 * @param length of the array (might be smaller than array.length), which is at least HEADER_LENGTH
 	 * @return TCPpacket deserialized from array
 	 */
-	public static TCPPacket decode(byte[] array, int length){
+	public static TCPSegment decode(byte[] array, int length){
 		int src_port = (((int) array[0]) <<8) | (int)array[1];
 		
 		int dest_port = (((int) array[2]) <<8) | (int)array[3];
@@ -138,7 +150,7 @@ public class TCPPacket{
     		data[i] = array[i + HEADER_LENGTH];
     	}
 		
-		return new TCPPacket(src_port, dest_port, seq_nr, ack_nr,
+		return new TCPSegment(src_port, dest_port, seq_nr, ack_nr,
     			ack, syn, fin, data, checksum);
 	}
 	

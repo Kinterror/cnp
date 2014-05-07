@@ -4,7 +4,7 @@ import java.io.IOException;
 
 import android.util.Log;
 import nl.vu.cs.cn.IP.*;
-import nl.vu.cs.cn.TcpControlBlock.ConnectionState;
+import nl.vu.cs.cn.TCPControlBlock.ConnectionState;
 
 /**
  * This class represents a TCP stack. It should be built on top of the IP stack
@@ -36,7 +36,7 @@ public class TCP {
 
     	/* Hint: You probably need some socket specific data. */
     			
-		TcpControlBlock tcb;
+		TCPControlBlock tcb;
 		
     	/**
     	 * Construct a client socket.
@@ -51,7 +51,7 @@ public class TCP {
     	 * @param port the local port to use
     	 */
         private Socket(int port) {
-        	tcb = new TcpControlBlock();
+        	tcb = new TCPControlBlock();
         	tcb.bind(INADDR_ANY, port);
         }
 
@@ -81,8 +81,9 @@ public class TCP {
         	tcb.setState(ConnectionState.S_LISTEN);
             try {
             	//receive a packet from the network
-				TCPPacket syn_pck = recv_tcp_packet();
-				tcb.their_port = syn_pck.src_port;
+				TCPSegment syn_pck = recv_tcp_packet();
+				//update connection source
+				tcb.setSource(syn_pck);
 				//do stuff
 			} catch (CorruptedPacketException e) {
 				//wait for packet to arrive again.
@@ -192,7 +193,7 @@ public class TCP {
      * @param packet
      * @throws IOException 
      */
-	public void send_tcp_packet(IpAddress destination, TCPPacket p) throws IOException{
+	public void send_tcp_packet(IpAddress destination, TCPSegment p) throws IOException{
     	//get integer value of IPAddress
 		int destIpInt = destination.getAddress();
 		
@@ -218,7 +219,7 @@ public class TCP {
      * receive a packet
 	 * @throws CorruptedPacketException
      */
-	public TCPPacket recv_tcp_packet() throws CorruptedPacketException{
+	public TCPSegment recv_tcp_packet() throws CorruptedPacketException{
 		try {
 			return recv_tcp_packet(0);
 		} catch (InterruptedException e) {
@@ -233,7 +234,7 @@ public class TCP {
 	 * @throws InterruptedException
 	 * @throws CorruptedPacketException
      */
-    public TCPPacket recv_tcp_packet(int timeout) throws CorruptedPacketException, InterruptedException{
+    public TCPSegment recv_tcp_packet(int timeout) throws CorruptedPacketException, InterruptedException{
     	Packet ip_packet = new Packet();
     	try {
 	    	if(timeout > 0){
@@ -251,13 +252,15 @@ public class TCP {
 			return null;
 		}
 		//packet is too short to parse
-		if(ip_packet.length < TCPPacket.HEADER_LENGTH || ip_packet.data.length < TCPPacket.HEADER_LENGTH 
+		if(ip_packet.length < TCPSegment.HEADER_LENGTH || ip_packet.data.length < TCPSegment.HEADER_LENGTH 
 				|| ip_packet.data.length < ip_packet.length){
 			throw new CorruptedPacketException("Packet too short");
 		}
 		
 		//parse packet
-		TCPPacket tcp_packet = TCPPacket.decode(ip_packet.data, ip_packet.length);
+		TCPSegment tcp_packet = TCPSegment.decode(ip_packet.data, ip_packet.length);
+		//get source IP address which is used by the higher layers
+		tcp_packet.source_ip = ip_packet.source;
 		
 		//validate checksum
 		if (!tcp_packet.validateChecksum(ip_packet.source, ip_packet.destination)){
