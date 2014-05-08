@@ -27,7 +27,7 @@ public class TCPSegment{
 	 * all possible TCP segment types
 	 */
 	public enum TCPSegmentType{
-		SYN, ACK, SYNACK, FIN, DATA
+		SYN, ACK, SYNACK, FIN, DATA, FINACK
 	}
 	
 	
@@ -62,6 +62,8 @@ public class TCPSegment{
 			syn = 1;
 		case DATA:
 			break;
+		case FINACK:
+			fin = 1;
 		case ACK:
 			ack = 1;
 			break;
@@ -248,9 +250,7 @@ public class TCPSegment{
 	public boolean validateChecksum(int source, int dest){
 		return (checksum == calculate_checksum(source, dest, IP.TCP_PROTOCOL));
 	}
-	
-	
-	
+		
 	private static TCPSegmentType getSegmentType(int syn, int ack, int fin){
 		if (syn == 0 && fin == 0 && ack == 0){
 			return TCPSegmentType.DATA;
@@ -266,6 +266,9 @@ public class TCPSegment{
 		}
 		if (syn == 1 && ack == 1 && fin == 0){
 			return TCPSegmentType.SYNACK;
+		}
+		if (syn == 0 && ack == 1 && fin == 1){
+			return TCPSegmentType.FINACK;
 		}
 		return null;
 	}

@@ -23,6 +23,16 @@ public class TCP {
 	/**packet ID which is initially zero and is incremented each time a packet is sent through the IP layer*/
 	int ip_packet_id;
 	
+	/**the timeout for receiving packets*/
+	public int timeout;
+	
+	/**the default for receiving packets*/
+	public static final int DEFAULT_TIMEOUT = 5;
+	
+	public int maxTries;
+	
+	public static final int DEFAULT_MAX_TRIES = 5;
+	
     /**
      * This class represents a TCP socket.
      *
@@ -79,14 +89,20 @@ public class TCP {
         	
         	while(tcb.getState() != ConnectionState.S_ESTABLISHED){
         		//send syn_pck
-        		tcb.setState(ConnectionState.S_SYN_SENT);
-        		
-        		//try to receive synack in timeout. If true: send ack.
+        		try {
+					send_tcp_segment(dst, syn_pck);
+					tcb.setState(ConnectionState.S_SYN_SENT);
+				} catch (IOException e) {
+					// TODO Auto-generated catch block
+					e.printStackTrace();
+				}
+        		        		
+        		//try to receive synack in timeout.
         		
         		
         	}
-        	
-        	return false;
+        	//send ack.
+        	return true;
         }	
 
         /**
@@ -97,10 +113,10 @@ public class TCP {
         	
         	//client sockets and opened cannot accept
         	if(isClientSocket){
-        		System.err.println("Called accept() on a client socket");
+        		Log.e("accept() error","Called accept() on a client socket");
         		System.exit(-1);
         	} else if (tcb.getState() != ConnectionState.S_CLOSED){
-        		System.err.println("Called accept() on an opened socket");
+        		Log.e("accept() error","Called accept() on an opened socket");
         		System.exit(-1);
         	}
         	
@@ -112,12 +128,11 @@ public class TCP {
 	        	try {
 	            	//receive a packet from the network
 					syn_pck = recv_tcp_segment();
-					if (syn_pck.getSegmentType() == TCPSegmentType.SYN && 
-							syn_pck.hasDestPort(tcb.getLocalSocketAddress().getPort()))
+					if(tcb.isValidSegment(syn_pck, TCPSegmentType.SYN))
 					{
 						//update connection source
 						tcb.setRemoteSocketAddress(syn_pck.getSrcSocketAddress());
-						//generate sequence number, update state, and acknowledgement number.
+						//generate sequence number, update state, and acknowledgment number.
 						
 						tcb.set_acknr(syn_pck.seq_nr);
 						tcb.setState(ConnectionState.S_SYN_RCVD);
@@ -138,6 +153,13 @@ public class TCP {
             //try to send the packet
             while(tcb.getState() == ConnectionState.S_SYN_RCVD){            	
             	//try to send a synack, resend if it fails
+            	try {
+					send_tcp_segment(destAddr.getIp(), syn_ack);
+					//start timed wait for ack
+				} catch (IOException e) {
+					// TODO Auto-generated catch block
+					e.printStackTrace();
+				}
             	
             	//if an ack is received:
             	tcb.setState(ConnectionState.S_ESTABLISHED);
@@ -177,9 +199,6 @@ public class TCP {
         	}
             // Write to the socket here.
         	
-        	//TCPHeader header = new TCPHeader(src_port, dest_port, seq_nr, ack_nr, ack, syn, fin);
-        	
-        	
             return -1;
         }
 
@@ -190,10 +209,50 @@ public class TCP {
          * @return true unless no connection was open.
          */
         public boolean close() {
-        	
-            // Close the socket cleanly here.
-
-            return false;
+        	switch(tcb.getState()){
+        	case S_ESTABLISHED:
+            	//TODO send close message
+            	tcb.setState(ConnectionState.S_FIN_WAIT_1);
+            	
+            	//wait for ack.
+            	TCPSegment segment;
+            	int tries = 0;
+            	while(tcb.getState() == ConnectionState.S_FIN_WAIT_1){
+					try {
+						segment = recv_tcp_segment(timeout);
+						switch(segment.getSegmentType()){
+		            	case ACK:
+		            		tcb.setState(ConnectionState.S_FIN_WAIT_2);
+		            		break;
+		            	case FIN:
+		            		//do simultaneous closing procedure
+		            		break;
+		            	case DATA:
+		            		//handle data and wait again
+		            		break;
+		            	default:
+		            		Log.e("close() error", "received unexpected packet");
+		            	}
+					} catch (Exception e) {
+						if (++tries >= maxTries){
+							Log.e("close() error", "exceeded maximum number of receive tries");
+							return false;
+						}
+					}
+            	}
+            	return true;
+        	case S_CLOSE_WAIT:
+        		//send fin ack
+        		tcb.setState(ConnectionState.S_LAST_ACK);
+        		
+        		//wait for ack. if not, resend. else:
+        		tcb.setState(ConnectionState.S_CLOSED);
+        		
+        		return true;
+        	default:
+        		Log.e("close() error", "can't close a non-open socket");
+        		return false;
+        	}
         }
     }
 
@@ -208,6 +267,8 @@ public class TCP {
     public TCP(int address) throws IOException {
         ip = new IP(address);
         ip_packet_id = 0;
+        timeout = DEFAULT_TIMEOUT;
+        maxTries = DEFAULT_MAX_TRIES;
     }
 
     /**

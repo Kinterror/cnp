@@ -3,6 +3,7 @@ package nl.vu.cs.cn;
 import java.util.Random;
 
 import nl.vu.cs.cn.IP.IpAddress;
+import nl.vu.cs.cn.TCPSegment.TCPSegmentType;
 
 /**definition of the Connection states*/
 class TCPControlBlock{
@@ -90,5 +91,9 @@ class TCPControlBlock{
 	
 	void set_acknr(long acknr){
 		our_expected_ack = acknr;
+	}
+
+	public boolean isValidSegment(TCPSegment syn_pck, TCPSegmentType type) {
+		return syn_pck.hasDestPort(local_port) && syn_pck.getSegmentType() == type;
 	}
 }
