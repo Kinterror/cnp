@@ -1,5 +1,7 @@
 package nl.vu.cs.cn;
 
+import nl.vu.cs.cn.IP.IpAddress;
+
 /**
  * this class represents the TCP header fields and encode and decode operations
  */
@@ -21,13 +23,21 @@ public class TCPSegment{
 	
 	byte[] data;
 	
+	/**
+	 * all possible TCP segment types
+	 */
+	public enum TCPSegmentType{
+		SYN, ACK, SYNACK, FIN, DATA
+	}
+	
+	
 	//these fields are not formally a part of the TCP header; however, in our implementation they are used. 
 	public static final int HEADER_LENGTH = 20;
-	int source_ip;
+	IpAddress source_ip;
 	
 	//constructor for a segment without specified checksum
 	TCPSegment(int src_port, int dest_port, long seq_nr, long ack_nr,
-			int ack, int syn, int fin, byte[] data){
+			TCPSegmentType st, byte[] data){
 		
 		//set other flags unused by this implementation
 		cwr = 0; ece = 0; urg = 0; psh = 1; rst = 0; ns = 0; 
@@ -41,22 +51,40 @@ public class TCPSegment{
 		this.dest_port = dest_port;
 		this.seq_nr = seq_nr;
 		this.ack_nr = ack_nr;
-		this.ack = ack;
-		this.syn = syn;
-		this.fin = fin;
-		this.data = new byte[data.length];
-		for(int i = 0; i < data.length; i++){
-			this.data[i] = data[i];
+		
+		//set flags
+		syn = ack = fin = 0;
+		
+		switch(st){
+		case SYNACK:
+			ack = 1;
+		case SYN:
+			syn = 1;
+		case DATA:
+			break;
+		case ACK:
+			ack = 1;
+			break;
+		case FIN:
+			fin = 1;
+			break;			
 		}
 		
+		//add data
+		if(data != null){
+			this.data = new byte[data.length];
+			for(int i = 0; i < data.length; i++){
+				this.data[i] = data[i];
+			}
+		}
 		
 	}
 	
 	//constructor with checksum
 	TCPSegment(int src_port, int dest_port, long seq_nr, long ack_nr,
-			int ack, int syn, int fin, byte[] data, short checksum){
+			TCPSegmentType st, byte[] data, short checksum){
 		this(src_port, dest_port, seq_nr, ack_nr,
-    			ack, syn, fin, data);
+    			st, data);
 		this.checksum = checksum;
 	}
 	
@@ -151,7 +179,7 @@ public class TCPSegment{
     	}
 		
 		return new TCPSegment(src_port, dest_port, seq_nr, ack_nr,
-    			ack, syn, fin, data, checksum);
+    			getSegmentType(syn, ack, fin), data, checksum);
 	}
 	
 	
@@ -208,6 +236,8 @@ public class TCPSegment{
 		return (short) ~sum;
 	}
 	
+	
+	
 	/**
 	 * Compare two checksums to see if they match.
 	 * 
@@ -219,6 +249,46 @@ public class TCPSegment{
 		return (checksum == calculate_checksum(source, dest, IP.TCP_PROTOCOL));
 	}
 	
+	
+	
+	private static TCPSegmentType getSegmentType(int syn, int ack, int fin){
+		if (syn == 0 && fin == 0 && ack == 0){
+			return TCPSegmentType.DATA;
+		}
+		if (syn == 1 && fin == 0 && ack == 0){
+			return TCPSegmentType.SYN;
+		}
+		if (fin == 1 && syn == 0 && ack == 0){
+			return TCPSegmentType.FIN;
+		}
+		if (ack == 1 && syn == 0 && fin == 0){
+			return TCPSegmentType.ACK;
+		}
+		if (syn == 1 && ack == 1 && fin == 0){
+			return TCPSegmentType.SYNACK;
+		}
+		return null;
+	}
+	
+	/**
+	 * method to check what kind of packet this is
+	 */
+	public TCPSegmentType getSegmentType(){
+		return getSegmentType(syn, ack, fin);
+	}
+	
+	
+	/**
+	 * @param port
+	 * @return true if the packet contains the destination port equal to port
+	 */
+	boolean hasDestPort(int port){
+		return dest_port == port;
+	}
+	
+	public SocketAddress getSrcSocketAddress(){
+		return new SocketAddress(source_ip, src_port);
+	}
 	
 	/**
 	 * Convert the data byte array of a TCP segment into a String object.

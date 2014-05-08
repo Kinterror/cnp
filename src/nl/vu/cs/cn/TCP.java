@@ -5,6 +5,7 @@ import java.io.IOException;
 import android.util.Log;
 import nl.vu.cs.cn.IP.*;
 import nl.vu.cs.cn.TCPControlBlock.ConnectionState;
+import nl.vu.cs.cn.TCPSegment.TCPSegmentType;
 
 /**
  * This class represents a TCP stack. It should be built on top of the IP stack
@@ -12,19 +13,13 @@ import nl.vu.cs.cn.TCPControlBlock.ConnectionState;
  */
 public class TCP {
 	
-	/** The port a client socket will bind to automatically */
+	/** The port a client socket will bind to automatically. Since only one connection is allowed at a time,
+	 * only one port is needed for this. */
 	public static final int defaultClientPort = 12345;
 	
-	/** the ip address used to indicate a server accepts connections from any IP addresses*/
-	public static final IpAddress INADDR_ANY = IpAddress.getAddress(0);
-
 	/** The underlying IP stack for this TCP stack. */
 	private IP ip;
 
-	
-	
-	
-	
 	/**packet ID which is initially zero and is incremented each time a packet is sent through the IP layer*/
 	int ip_packet_id;
 	
@@ -35,7 +30,8 @@ public class TCP {
     public class Socket {
 
     	/* Hint: You probably need some socket specific data. */
-    			
+    	boolean isClientSocket;
+    	
 		TCPControlBlock tcb;
 		
     	/**
@@ -43,6 +39,7 @@ public class TCP {
     	 */
     	private Socket() {
     		this(defaultClientPort);
+    		isClientSocket = true;
     	}
 
     	/**
@@ -51,8 +48,9 @@ public class TCP {
     	 * @param port the local port to use
     	 */
         private Socket(int port) {
+        	isClientSocket = false;
         	tcb = new TCPControlBlock();
-        	tcb.bind(INADDR_ANY, port);
+        	tcb.setLocalSocketAddress(new SocketAddress(ip.getLocalAddress(), port));
         }
 
 		/**
@@ -63,11 +61,30 @@ public class TCP {
          * @return true if the connect succeeded.
          */
         public boolean connect(IpAddress dst, int port) {
-
-            // Implement the connection side of the three-way handshake here.
-        	tcb.their_port = port;
-        	tcb.their_ip_addr = dst;
         	
+        	if (!isClientSocket || tcb.getState() != ConnectionState.S_CLOSED){
+        		return false;
+        	}
+        	
+            // Implement the connection side of the three-way handshake here.
+        	tcb.setRemoteSocketAddress(new SocketAddress(dst, port));
+        	
+        	//generate new sequence number
+        	long seq_nr = tcb.generate_seqnr();
+        	
+        	TCPSegment syn_pck = new TCPSegment(tcb.getLocalSocketAddress().getPort(), port, seq_nr, 0,
+        			TCPSegmentType.SYN, null);
+        	
+        	
+        	
+        	while(tcb.getState() != ConnectionState.S_ESTABLISHED){
+        		//send syn_pck
+        		tcb.setState(ConnectionState.S_SYN_SENT);
+        		
+        		//try to receive synack in timeout. If true: send ack.
+        		
+        		
+        	}
         	
         	return false;
         }	
@@ -78,19 +95,53 @@ public class TCP {
          */
         public void accept() {
         	
+        	//client sockets and opened cannot accept
+        	if(isClientSocket){
+        		System.err.println("Called accept() on a client socket");
+        		System.exit(-1);
+        	} else if (tcb.getState() != ConnectionState.S_CLOSED){
+        		System.err.println("Called accept() on an opened socket");
+        		System.exit(-1);
+        	}
+        	
         	tcb.setState(ConnectionState.S_LISTEN);
-            try {
-            	//receive a packet from the network
-				TCPSegment syn_pck = recv_tcp_segment();
-				//update connection source
-				tcb.setSource(syn_pck);
-				//do stuff
-			} catch (CorruptedPacketException e) {
-				//wait for packet to arrive again.
-				
-			}
-        	// Implement the receive side of the three-way handshake here.
+        	
+        	TCPSegment syn_pck = null;
+        	
+            while (tcb.getState() == ConnectionState.S_LISTEN){
+	        	try {
+	            	//receive a packet from the network
+					syn_pck = recv_tcp_segment();
+					if (syn_pck.getSegmentType() == TCPSegmentType.SYN && 
+							syn_pck.hasDestPort(tcb.getLocalSocketAddress().getPort()))
+					{
+						//update connection source
+						tcb.setRemoteSocketAddress(syn_pck.getSrcSocketAddress());
+						//generate sequence number, update state, and acknowledgement number.
+						
+						tcb.set_acknr(syn_pck.seq_nr);
+						tcb.setState(ConnectionState.S_SYN_RCVD);
+			        	// Implement the receive side of the three-way handshake here.
+					}
+					//else, discard it and listen again.
+				} catch (CorruptedPacketException e) {
+					//wait for packet to arrive again.
+				}
+            }
             
+            //compose a synack message
+            long seq_nr = tcb.generate_seqnr();
+            SocketAddress srcAddr = tcb.getLocalSocketAddress(), destAddr = tcb.getRemoteSocketAddress();
+            TCPSegment syn_ack = new TCPSegment(srcAddr.getPort(), destAddr.getPort(), seq_nr, syn_pck.seq_nr, 
+        			TCPSegmentType.SYNACK, null);
+            
+            //try to send the packet
+            while(tcb.getState() == ConnectionState.S_SYN_RCVD){            	
+            	//try to send a synack, resend if it fails
+            	
+            	//if an ack is received:
+            	tcb.setState(ConnectionState.S_ESTABLISHED);
+            }
         }
 
         /**
@@ -139,7 +190,7 @@ public class TCP {
          * @return true unless no connection was open.
          */
         public boolean close() {
-
+        	
             // Close the socket cleanly here.
 
             return false;
@@ -206,9 +257,10 @@ public class TCP {
     	
     	    	
     	//create new packet and increment ID counter
-    	Packet ip_packet = new Packet(destIpInt, IP.TCP_PROTOCOL, ip_packet_id++,
+    	Packet ip_packet = new Packet(destIpInt, IP.TCP_PROTOCOL, ip_packet_id,
     			bytes, bytes.length);
     	ip_packet.source = source;
+    	ip_packet_id++;
     	
     	//send packet
     	ip.ip_send(ip_packet);
@@ -259,8 +311,9 @@ public class TCP {
 		
 		//parse packet
 		TCPSegment tcp_packet = TCPSegment.decode(ip_packet.data, ip_packet.length);
+		
 		//get source IP address which is used by the higher layers
-		tcp_packet.source_ip = ip_packet.source;
+		tcp_packet.source_ip = IpAddress.getAddress(ip_packet.source);
 		
 		//validate checksum
 		if (!tcp_packet.validateChecksum(ip_packet.source, ip_packet.destination)){
