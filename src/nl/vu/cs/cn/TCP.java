@@ -27,11 +27,11 @@ public class TCP {
 	public int timeout;
 	
 	/**the default for receiving packets*/
-	public static final int DEFAULT_TIMEOUT = 5;
+	public static final int DEFAULT_TIMEOUT = 1;
 	
 	public int maxTries;
 	
-	public static final int DEFAULT_MAX_TRIES = 5;
+	public static final int DEFAULT_MAX_TRIES = 10;
 	
     /**
      * This class represents a TCP socket.
@@ -43,6 +43,7 @@ public class TCP {
     	boolean isClientSocket;
     	
 		TCPControlBlock tcb;
+		private UnboundedByteBuffer sock_buf;
 		
     	/**
     	 * Construct a client socket.
@@ -61,6 +62,8 @@ public class TCP {
         	isClientSocket = false;
         	tcb = new TCPControlBlock();
         	tcb.setLocalSocketAddress(new SocketAddress(ip.getLocalAddress(), port));
+        	
+        	sock_buf = new UnboundedByteBuffer();
         }
 
 		/**
@@ -127,8 +130,8 @@ public class TCP {
             while (tcb.getState() == ConnectionState.S_LISTEN){
 	        	try {
 	            	//receive a packet from the network
-					syn_pck = recv_tcp_segment();
-					if(tcb.isValidSegment(syn_pck, TCPSegmentType.SYN))
+					syn_pck = sockRecv();
+					if(tcb.isValidSegment(syn_pck) &&  syn_pck.getSegmentType() == TCPSegmentType.SYN)
 					{
 						//update connection source
 						tcb.setRemoteSocketAddress(syn_pck.getSrcSocketAddress());
@@ -139,7 +142,7 @@ public class TCP {
 			        	// Implement the receive side of the three-way handshake here.
 					}
 					//else, discard it and listen again.
-				} catch (CorruptedPacketException e) {
+				} catch (InvalidPacketException e) {
 					//wait for packet to arrive again.
 				}
             }
@@ -154,7 +157,7 @@ public class TCP {
             while(tcb.getState() == ConnectionState.S_SYN_RCVD){            	
             	//try to send a synack, resend if it fails
             	try {
-					send_tcp_segment(destAddr.getIp(), syn_ack);
+					sockSend(destAddr.getIp(), syn_ack);
 					//start timed wait for ack
 				} catch (IOException e) {
 					// TODO Auto-generated catch block
@@ -165,7 +168,35 @@ public class TCP {
             	tcb.setState(ConnectionState.S_ESTABLISHED);
             }
         }
-
+        
+        private void handleData(TCPSegment seg){
+        	//put data in buffer, send ack
+        }
+        
+        private TCPSegment sockRecv(int timeout) throws InvalidPacketException, InterruptedException{
+        	TCPSegment pck = recv_tcp_segment(timeout);
+        	if(!tcb.isValidSegment(pck)){
+        		throw new InvalidPacketException("Received a packet not for us");
+        	}
+        	tcb.getAndIncrement_acknr(pck.getDataLength());
+        	return pck;
+        }
+        
+        private TCPSegment sockRecv() throws InvalidPacketException{
+        	try{
+        		return sockRecv(0);
+        	} catch (InterruptedException e){
+        		//never happens
+        		return null;
+        	}
+        }
+        
+        private void sockSend(IpAddress destination, TCPSegment pck) throws IOException{
+        	pck.setSeqNr(tcb.getAndIncrement_seqnr(pck.getDataLength()));
+        	pck.setAckNr(tcb.get_acknr());
+        	send_tcp_segment(destination, pck);
+        }
+        
         /**
          * Reads bytes from the socket into the buffer.
          * This call is not required to return maxlen bytes
@@ -177,14 +208,54 @@ public class TCP {
          * @return the number of bytes read, or -1 if an error occurs.
          */
         public int read(byte[] buf, int offset, int maxlen) {
-//        	if(block.state != ConnectionState.S_ESTABLISHED){
-//        		return -1;
-//        	}
-            // Read from the socket here.
+        	switch(tcb.getState()){
+        	case S_ESTABLISHED:
+        	case S_CLOSE_WAIT:
+        	case S_FIN_WAIT_1:
+        	case S_FIN_WAIT_2:
+        		//check if there are maxlen bytes in the buffer
+        		//if so, return bytes in the buffer
+        		
+        		//if not: receive data from the network???
+        		boolean ToReceived = true;
+        		
+        		while(ToReceived){
+        		
+	        		try {
+						//receive a packet
+	        			TCPSegment seg = sockRecv(1);
+	        			
+	        			switch(seg.getSegmentType()){
+						case DATA:
+							//we got what we received
+							handleData(seg);
+							break;
+						default:
+							
+						}
+	        			
+					} catch (InvalidPacketException e) {
+						try {
+							Thread.sleep(1000);
+						} catch (InterruptedException e1) {e.printStackTrace();} //do nothing
+						//wait for packet to arrive again
+						continue;
+					} catch (InterruptedException e) {
+						break;
+					}
+        		}
+        		
+        		break;
+        	default:
+        		return -1;
+        	}
+        	//read data
+        	
+        	
         	
             return -1;
         }
-
+        
         /**
          * Writes to the socket from the buffer.
          *
@@ -194,10 +265,14 @@ public class TCP {
          * @return the number of bytes written or -1 if an error occurs.
          */
         public int write(byte[] buf, int offset, int len) {
-        	if(tcb.getState() != ConnectionState.S_ESTABLISHED){
+        	switch(tcb.getState()){
+        	case S_ESTABLISHED:
+        	case S_CLOSE_WAIT:
+        		break;
+        	default:
         		return -1;
         	}
-            // Write to the socket here.
+            // Write to the socket.
         	
             return -1;
         }
@@ -219,7 +294,7 @@ public class TCP {
             	int tries = 0;
             	while(tcb.getState() == ConnectionState.S_FIN_WAIT_1){
 					try {
-						segment = recv_tcp_segment(timeout);
+						segment = sockRecv(timeout);
 						switch(segment.getSegmentType()){
 		            	case ACK:
 		            		tcb.setState(ConnectionState.S_FIN_WAIT_2);
@@ -328,26 +403,14 @@ public class TCP {
 		
     }
     
-	/**
-     * receive a packet
-	 * @throws CorruptedPacketException
-     */
-	public TCPSegment recv_tcp_segment() throws CorruptedPacketException{
-		try {
-			return recv_tcp_segment(0);
-		} catch (InterruptedException e) {
-			// never happens since there is no timeout
-			return null;
-		}
-		
-	}
+	
 	/**
      * receive a packet within a given time
      * @param timeout the timeout (seconds) to wait for a packet. If set to a value <= 0, it waits indefinitely.
 	 * @throws InterruptedException
-	 * @throws CorruptedPacketException
+	 * @throws InvalidPacketException
      */
-    public TCPSegment recv_tcp_segment(int timeout) throws CorruptedPacketException, InterruptedException{
+    public TCPSegment recv_tcp_segment(int timeout) throws InvalidPacketException, InterruptedException{
     	Packet ip_packet = new Packet();
     	try {
 	    	if(timeout > 0){
@@ -367,7 +430,7 @@ public class TCP {
 		//packet is too short to parse
 		if(ip_packet.length < TCPSegment.HEADER_LENGTH || ip_packet.data.length < TCPSegment.HEADER_LENGTH 
 				|| ip_packet.data.length < ip_packet.length){
-			throw new CorruptedPacketException("Packet too short");
+			throw new InvalidPacketException("Packet too short");
 		}
 		
 		//parse packet
@@ -379,7 +442,7 @@ public class TCP {
 		//validate checksum
 		if (!tcp_packet.validateChecksum(ip_packet.source, ip_packet.destination)){
 			//packet was corrupted because checksum is not correct
-			throw new CorruptedPacketException("Invalid checksum");
+			throw new InvalidPacketException("Invalid checksum");
 		}
 		
 		return tcp_packet;

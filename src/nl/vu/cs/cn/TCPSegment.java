@@ -280,6 +280,25 @@ public class TCPSegment{
 		return getSegmentType(syn, ack, fin);
 	}
 	
+	public int getDataLength(){
+		return data.length;
+	}
+	
+	public long getSeqNr(){
+		return seq_nr;
+	}
+	
+	public long getAckNr(){
+		return ack_nr;
+	}
+	
+	public void setSeqNr(long nr){
+		seq_nr = nr;
+	}
+	
+	public void setAckNr(long nr){
+		ack_nr = nr;
+	}
 	
 	/**
 	 * @param port

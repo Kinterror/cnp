@@ -3,7 +3,6 @@ package nl.vu.cs.cn;
 import java.util.Random;
 
 import nl.vu.cs.cn.IP.IpAddress;
-import nl.vu.cs.cn.TCPSegment.TCPSegmentType;
 
 /**definition of the Connection states*/
 class TCPControlBlock{
@@ -16,7 +15,7 @@ class TCPControlBlock{
 	
 	//size of the data buffer
 	//TODO set to right value
-	public static final int TCB_BUF_SIZE = 0;
+	//private static final int TCB_BUF_SIZE = 0;
 	
 	public enum ConnectionState
 	{
@@ -29,22 +28,18 @@ class TCPControlBlock{
 	private IpAddress remote_ip_addr;
 	private int local_port;
 	private int remote_port;
-	long our_sequence_num;
-	long our_expected_ack;
-	byte tcb_data[];
+	private long our_sequence_num;
+	private long our_expected_ack;
 	
 	TCPControlBlock(){
 		state = ConnectionState.S_CLOSED;
-		tcb_data = new byte[TCB_BUF_SIZE];
-		//our_sequence_num = generate_seqnr();
 		our_sequence_num = our_expected_ack = 0;
 		local_port = 0;
 		remote_port = 0;
 		
 		rand = new Random();
 	}
-	
-	
+		
 	void setState(ConnectionState s){
 		this.state = s;
 	}
@@ -82,18 +77,33 @@ class TCPControlBlock{
 	/**
 	 * increments the sequence number by size, and do it modulo the maximum sequence number. Then update the value
 	 * @param size
-	 * @return the new sequence number
+	 * @return the old sequence number
 	 */
-	long increment_seqnr(long size){
+	long getAndIncrement_seqnr(long size){
+		long tmp = our_sequence_num;
 		//this sequence number never becomes negative
-		return our_sequence_num = (our_sequence_num + size) % UINT_32_MAX;
+		our_sequence_num = (our_sequence_num + size) % UINT_32_MAX;
+		return tmp;
 	}
 	
 	void set_acknr(long acknr){
 		our_expected_ack = acknr;
 	}
-
-	public boolean isValidSegment(TCPSegment syn_pck, TCPSegmentType type) {
-		return syn_pck.hasDestPort(local_port) && syn_pck.getSegmentType() == type;
+	
+	long getAndIncrement_acknr(long size){
+		long tmp = our_expected_ack;
+		our_expected_ack = (our_expected_ack + size) % UINT_32_MAX;
+		return tmp;
 	}
+
+	long get_acknr(){
+		return our_expected_ack;
+	}
+	
+	public boolean isValidSegment(TCPSegment pck) {
+		return 	pck.hasDestPort(local_port) &&
+				pck.seq_nr == our_expected_ack &&
+				pck.ack_nr == our_sequence_num;
+	}
+	
 }
