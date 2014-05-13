@@ -29,9 +29,12 @@ public class TCP {
 	/**the default for receiving packets*/
 	public static final int DEFAULT_TIMEOUT = 1;
 	
-	public int maxTries;
+	public static final int MAX_TRIES = 10;
 	
-	public static final int DEFAULT_MAX_TRIES = 10;
+	public static final int IP_HEADER_LENGTH = 20;
+	
+	/**the maximum size (bytes) of any packet sent through the ip layer*/
+	public static final int MAX_TCPIP_SEGMENT_SIZE = 8192;
 	
     /**
      * This class represents a TCP socket.
@@ -82,13 +85,12 @@ public class TCP {
             // Implement the connection side of the three-way handshake here.
         	tcb.setRemoteSocketAddress(new SocketAddress(dst, port));
         	
-        	//generate new sequence number
-        	long seq_nr = tcb.generate_seqnr();
+        	TCPSegment syn_pck = new TCPSegment(TCPSegmentType.SYN);
         	
-        	TCPSegment syn_pck = new TCPSegment(tcb.getLocalSocketAddress().getPort(), port, seq_nr, 0,
-        			TCPSegmentType.SYN, null);
-        	
-        	
+        	//add port and sequence number fields
+        	syn_pck.setSeqNr(tcb.generate_seqnr());
+        	syn_pck.dest_port = port;
+        	syn_pck.src_port = tcb.getLocalSocketAddress().getPort();
         	
         	while(tcb.getState() != ConnectionState.S_ESTABLISHED){
         		//send syn_pck
@@ -136,7 +138,7 @@ public class TCP {
 						//update connection source
 						tcb.setRemoteSocketAddress(syn_pck.getSrcSocketAddress());
 						//generate sequence number, update state, and acknowledgment number.
-						
+						tcb.generate_seqnr();
 						tcb.set_acknr(syn_pck.seq_nr);
 						tcb.setState(ConnectionState.S_SYN_RCVD);
 			        	// Implement the receive side of the three-way handshake here.
@@ -148,29 +150,47 @@ public class TCP {
             }
             
             //compose a synack message
-            long seq_nr = tcb.generate_seqnr();
-            SocketAddress srcAddr = tcb.getLocalSocketAddress(), destAddr = tcb.getRemoteSocketAddress();
-            TCPSegment syn_ack = new TCPSegment(srcAddr.getPort(), destAddr.getPort(), seq_nr, syn_pck.seq_nr, 
-        			TCPSegmentType.SYNACK, null);
+            
+            TCPSegment syn_ack = new TCPSegment(TCPSegmentType.SYNACK);
+            
             
             //try to send the packet
             while(tcb.getState() == ConnectionState.S_SYN_RCVD){            	
             	//try to send a synack, resend if it fails
-            	try {
-					sockSend(destAddr.getIp(), syn_ack);
-					//start timed wait for ack
-				} catch (IOException e) {
-					// TODO Auto-generated catch block
-					e.printStackTrace();
-				}
+				sockSend(syn_ack);
+				//TODO start timed wait for ack
+				
             	
             	//if an ack is received:
             	tcb.setState(ConnectionState.S_ESTABLISHED);
             }
         }
         
+        /**
+         * buffer the received data and send an ack
+         */
         private void handleData(TCPSegment seg){
-        	//put data in buffer, send ack
+        	//put the data at the end of the buffer
+        	sock_buf.buffer(seg.data);
+        	
+        	//send ack
+        	TCPSegment ack = new TCPSegment(TCPSegmentType.ACK);
+			sockSend(ack);
+        }
+        
+        /**here, process a received fin packet and ack it.*/
+        private void handleIncomingFin(){
+        	/*
+        	 * if we were in established state, go to close_wait state and send an ack.
+        	 * if we were already in close_wait, and receive a fin again, resend the ack since it was apparently lost.
+        	 */
+        	if (tcb.getState() == ConnectionState.S_ESTABLISHED || tcb.getState() == ConnectionState.S_CLOSE_WAIT){
+	        	tcb.setState(ConnectionState.S_CLOSE_WAIT);
+	        	//send ack
+	        	TCPSegment ack = new TCPSegment(TCPSegmentType.ACK);
+				sockSend(ack);				
+        	}
+        	//else, do nothing since
         }
         
         private TCPSegment sockRecv(int timeout) throws InvalidPacketException, InterruptedException{
@@ -191,10 +211,18 @@ public class TCP {
         	}
         }
         
-        private void sockSend(IpAddress destination, TCPSegment pck) throws IOException{
+        private void sockSend(TCPSegment pck) {
+        	SocketAddress remoteAddr = tcb.getRemoteSocketAddress();
+        	
         	pck.setSeqNr(tcb.getAndIncrement_seqnr(pck.getDataLength()));
         	pck.setAckNr(tcb.get_acknr());
-        	send_tcp_segment(destination, pck);
+        	pck.dest_port = remoteAddr.getPort();
+        	
+        	try{
+        	send_tcp_segment(remoteAddr.getIp(), pck);
+        	} catch (IOException e) {
+        		e.printStackTrace();
+        	}
         }
         
         /**
@@ -210,50 +238,46 @@ public class TCP {
         public int read(byte[] buf, int offset, int maxlen) {
         	switch(tcb.getState()){
         	case S_ESTABLISHED:
-        	case S_CLOSE_WAIT:
         	case S_FIN_WAIT_1:
         	case S_FIN_WAIT_2:
-        		//check if there are maxlen bytes in the buffer
-        		//if so, return bytes in the buffer
         		
-        		//if not: receive data from the network???
-        		boolean ToReceived = true;
-        		
-        		while(ToReceived){
+        		/*check if there are maxlen bytes in the buffer. If not, receive packets until we have enough.*/
+        		while(sock_buf.length() < maxlen){
         		
 	        		try {
 						//receive a packet
-	        			TCPSegment seg = sockRecv(1);
+	        			TCPSegment seg = sockRecv();
 	        			
 	        			switch(seg.getSegmentType()){
 						case DATA:
 							//we got what we received
 							handleData(seg);
 							break;
+						case FIN: /*handle closing*/
+							handleIncomingFin();
+							break;
 						default:
-							
+							//discard the packet
+							continue;
 						}
 	        			
 					} catch (InvalidPacketException e) {
 						try {
 							Thread.sleep(1000);
-						} catch (InterruptedException e1) {e.printStackTrace();} //do nothing
+						} catch (InterruptedException e1) {e1.printStackTrace();} //do nothing
 						//wait for packet to arrive again
 						continue;
-					} catch (InterruptedException e) {
-						break;
 					}
         		}
         		
-        		break;
+        	case S_CLOSE_WAIT:
+        		return sock_buf.deBuffer(buf, offset, maxlen);
         	default:
         		return -1;
         	}
+        	
         	//read data
         	
-        	
-        	
-            return -1;
         }
         
         /**
@@ -268,13 +292,42 @@ public class TCP {
         	switch(tcb.getState()){
         	case S_ESTABLISHED:
         	case S_CLOSE_WAIT:
-        		break;
+        		//maximum data length
+        		int max_data_len = MAX_TCPIP_SEGMENT_SIZE - IP_HEADER_LENGTH - TCPSegment.HEADER_LENGTH;
+        		
+        		//maybe the buffer is not long enough
+        		if((buf.length - offset) < len){
+        			len = buf.length - offset;
+        		}
+        		int bytesRemaining = len;
+        		
+        		//while there are still bytes to write
+        		while(bytesRemaining > 0){
+        			byte[] data;
+        			if(bytesRemaining >= max_data_len){
+        				//send a packet of max size
+        				data = new byte[max_data_len];
+        				bytesRemaining -= max_data_len;
+        			} else {
+        				data = new byte[bytesRemaining];
+        				bytesRemaining = 0;
+        			}
+        			for(int i = 0; i < data.length; i++){
+        				data[i] = buf[offset];
+        				offset++;
+        			}
+        			//create new packet
+        			TCPSegment pck = new TCPSegment(TCPSegmentType.DATA, data);
+        			
+        			//send packet
+        			sockSend(pck);
+        			
+        		}
+        		return len;
         	default:
         		return -1;
         	}
-            // Write to the socket.
-        	
-            return -1;
+            
         }
 
         /**
@@ -309,7 +362,7 @@ public class TCP {
 		            		Log.e("close() error", "received unexpected packet");
 		            	}
 					} catch (Exception e) {
-						if (++tries >= maxTries){
+						if (++tries >= MAX_TRIES){
 							Log.e("close() error", "exceeded maximum number of receive tries");
 							return false;
 						}
@@ -343,7 +396,6 @@ public class TCP {
         ip = new IP(address);
         ip_packet_id = 0;
         timeout = DEFAULT_TIMEOUT;
-        maxTries = DEFAULT_MAX_TRIES;
     }
 
     /**
@@ -380,7 +432,7 @@ public class TCP {
      * @param packet
      * @throws IOException 
      */
-	public void send_tcp_segment(IpAddress destination, TCPSegment p) throws IOException{
+	private void send_tcp_segment(IpAddress destination, TCPSegment p) throws IOException{
     	//get integer value of IPAddress
 		int destIpInt = destination.getAddress();
 		
@@ -410,7 +462,7 @@ public class TCP {
 	 * @throws InterruptedException
 	 * @throws InvalidPacketException
      */
-    public TCPSegment recv_tcp_segment(int timeout) throws InvalidPacketException, InterruptedException{
+    private TCPSegment recv_tcp_segment(int timeout) throws InvalidPacketException, InterruptedException{
     	Packet ip_packet = new Packet();
     	try {
 	    	if(timeout > 0){

@@ -35,7 +35,17 @@ public class TCPSegment{
 	public static final int HEADER_LENGTH = 20;
 	IpAddress source_ip;
 	
-	//constructor for a segment without specified checksum
+	/**constructor for a segment without specified ports, checksum and seqnrs*/
+	TCPSegment(TCPSegmentType st, byte[] data){
+		this(0, 0, 0, 0, st, data);
+	}
+	
+	/**constructor for a control segment with no data or otherwise specified fields*/
+	TCPSegment(TCPSegmentType st){
+		this(st, new byte[0]);
+	}
+	
+	/**constructor for a segment without specified checksum*/
 	TCPSegment(int src_port, int dest_port, long seq_nr, long ack_nr,
 			TCPSegmentType st, byte[] data){
 		
@@ -96,7 +106,11 @@ public class TCPSegment{
 	 * @return the byte array
 	 */
 	public byte[] encode(){
-		byte[] result = new byte[HEADER_LENGTH + data.length];
+		
+		//check if there is any data. If data = null: skip this.
+		int dataLength = data.length;
+		
+		byte[] result = new byte[HEADER_LENGTH + dataLength];
 		
 		//add source port
 		result[0] = (byte) (src_port>>8);
@@ -104,7 +118,7 @@ public class TCPSegment{
     	//add destination port
 		result[2] = (byte) (dest_port>>8);
 		result[3] = (byte) dest_port;
-		//add sequence nusegmentmber
+		//add sequence number
 		for(int i = 4; i < 8; i++){
 			result[i] = (byte) (seq_nr>>((i - 4) * 8));
 		}
@@ -135,7 +149,7 @@ public class TCPSegment{
 		result[19] = (byte) urgent_pointer;
 		
 		//copy data
-		for(int i = 0; i < data.length; i++){
+		for(int i = 0; i < dataLength; i++){
 			result[i + HEADER_LENGTH] = data[i];
 		}
 		
@@ -175,7 +189,8 @@ public class TCPSegment{
 		short checksum = (short) (c1 <<8 | c2);
 		
 		
-		byte[] data = new byte[length - HEADER_LENGTH];
+		/*check if there is any data. Otherwise, data is an empty array*/
+		byte [] data = new byte[length - HEADER_LENGTH];
 		for(int i = 0; i < data.length; i++){
     		data[i] = array[i + HEADER_LENGTH];
     	}
