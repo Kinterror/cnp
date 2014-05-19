@@ -102,8 +102,8 @@ class TCPControlBlock{
 	
 	public boolean isValidSegment(TCPSegment pck) {
 		return 	pck.hasDestPort(local_port) &&
-				pck.seq_nr == our_expected_ack &&
-				pck.ack_nr == our_sequence_num;
+				pck.hasSrcIp(remote_ip_addr) &&
+				pck.hasSrcPort(remote_port);
 	}
 	
 }

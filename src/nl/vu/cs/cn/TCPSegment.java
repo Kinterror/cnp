@@ -323,6 +323,14 @@ public class TCPSegment{
 		return dest_port == port;
 	}
 	
+	boolean hasSrcPort(int port){
+		return src_port == port;
+	}
+	
+	boolean hasSrcIp(IpAddress ip){
+		return source_ip.getAddress() == ip.getAddress();
+	}
+	
 	public SocketAddress getSrcSocketAddress(){
 		return new SocketAddress(source_ip, src_port);
 	}
