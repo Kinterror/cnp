@@ -475,12 +475,10 @@ public class TCP {
          * @return true unless no connection was open.
          */
         public boolean close() {
-        	TCPSegment segment, fin;
-        	
         	switch(tcb.getState()){
         	case S_ESTABLISHED:
         		//send fin
-        		fin = new TCPSegment(TCPSegmentType.FIN);
+        		TCPSegment fin = new TCPSegment(TCPSegmentType.FIN);
         		tcb.setState(ConnectionState.S_FIN_WAIT_1);
         		if (sendAndWaitAck(fin)){
         			tcb.setState(ConnectionState.S_FIN_WAIT_2);
