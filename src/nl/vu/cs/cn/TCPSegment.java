@@ -92,7 +92,7 @@ public class TCPSegment{
 		
 	}
 	
-	//constructor with checksum
+	/**constructor with checksum*/
 	TCPSegment(int src_port, int dest_port, long seq_nr, long ack_nr,
 			TCPSegmentType st, byte[] data, short checksum){
 		this(src_port, dest_port, seq_nr, ack_nr,

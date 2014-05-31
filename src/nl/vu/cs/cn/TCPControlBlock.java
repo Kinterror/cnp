@@ -39,6 +39,15 @@ class TCPControlBlock{
 		
 		rand = new Random();
 	}
+	
+	void initServer(TCPSegment s){
+		//update connection source
+		setRemoteSocketAddress(s.getSrcSocketAddress());
+		//generate sequence number and update state and acknowledgment number.
+		generate_seqnr();
+		set_acknr(s.seq_nr);
+		setState(ConnectionState.S_SYN_RCVD);
+	}
 		
 	void setState(ConnectionState s){
 		this.state = s;

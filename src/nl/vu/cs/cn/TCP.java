@@ -62,7 +62,6 @@ public class TCP {
 
     	/**
     	 * Construct a server socket bound to the given local port.
-		 *
     	 * @param port the local port to use
     	 */
         private Socket(int port) {
@@ -76,12 +75,13 @@ public class TCP {
 		/**
          * Connect this socket to the specified destination and port.
          *
-         * @param dst the destination to connect to
-         * @param port the port to connect to
+         * @param IpAddress dst - the destination to connect to
+         * @param int port - the TCP port to connect to
          * @return true if the connect succeeded.
          */
         public boolean connect(IpAddress dst, int port) {
         	
+        	//can't connect with a server socket or a socket with an already open connection
         	if (!isClientSocket || tcb.getState() != ConnectionState.S_CLOSED){
         		return false;
         	}
@@ -89,48 +89,22 @@ public class TCP {
             // Implement the connection side of the three-way handshake here.
         	tcb.setRemoteSocketAddress(new SocketAddress(dst, port));
         	
-        	TCPSegment syn_pck = new TCPSegment(TCPSegmentType.SYN);
+        	//construct a syn packet
+        	TCPSegment syn_pck = new TCPSegment(
+        			tcb.getLocalSocketAddress().getPort(),
+        			port, tcb.generate_seqnr(), 
+        			0,
+        			TCPSegmentType.SYN, new byte[0]
+        	);
         	
-        	//add port and sequence number fields
-        	syn_pck.setSeqNr(tcb.generate_seqnr());
-        	syn_pck.dest_port = port;
-        	syn_pck.src_port = tcb.getLocalSocketAddress().getPort();
-        	
-        	int ntries = 0;
-        	
-        	while(tcb.getState() != ConnectionState.S_ESTABLISHED && ntries++ < MAX_TRIES){
-        		//send syn_pck
-        		try {
-					send_tcp_segment(dst, syn_pck);
-					tcb.setState(ConnectionState.S_SYN_SENT);
-				} catch (IOException e) {
-					e.printStackTrace();
-				}
-        		
-        		//try to receive synack in timeout.
-        		try {
-					TCPSegment syn_ack = sockRecv(timeout);
-					switch(syn_ack.getSegmentType()){
-					case SYNACK:
-						break;
-					default:
-						continue;
-					}
-				} catch (Exception e) {
-					//resend
-					continue;
-				}
-        		//send ack
-        		TCPSegment ack = new TCPSegment(TCPSegmentType.ACK);
-        		sockSend(ack);
-        		tcb.setState(ConnectionState.S_ESTABLISHED);        		
-        	}
-        	
-        	//if connect failed for MAX_TRIES times
-        	if (ntries >= MAX_TRIES){
+        	//send it and wait for a synack
+        	tcb.setState(ConnectionState.S_SYN_SENT);
+        	if (sendAndWaitAck(syn_pck, true)){
+        		tcb.setState(ConnectionState.S_ESTABLISHED);
+        		return true;
+        	} else {
         		return false;
         	}
-        	return true;
         }	
 
         /**
@@ -139,7 +113,7 @@ public class TCP {
          */
         public void accept() {
         	
-        	//client sockets and opened cannot accept
+        	//client sockets and sockets with an already open connection cannot call accept
         	if(isClientSocket){
         		Log.e("accept() error","Called accept() on a client socket");
         		System.exit(-1);
@@ -147,6 +121,8 @@ public class TCP {
         		Log.e("accept() error","Called accept() on an opened socket");
         		System.exit(-1);
         	}
+        	
+        	//receive stuff
         	while (tcb.getState() != ConnectionState.S_ESTABLISHED){
 	        	
         		//listen for incoming connections
@@ -160,13 +136,8 @@ public class TCP {
 						syn_pck = sockRecv();
 						if(syn_pck.getSegmentType() == TCPSegmentType.SYN)
 						{
-							//update connection source
-							tcb.setRemoteSocketAddress(syn_pck.getSrcSocketAddress());
-							//generate sequence number, update state, and acknowledgment number.
-							tcb.generate_seqnr();
-							tcb.set_acknr(syn_pck.seq_nr);
-							tcb.setState(ConnectionState.S_SYN_RCVD);
-				        	// Implement the receive side of the three-way handshake here.
+							//initialize the connection state to S_SYN_RCVD
+							tcb.initServer(syn_pck);
 						}
 						//else, discard it and listen again.
 					} catch (InvalidPacketException e) {
@@ -175,30 +146,11 @@ public class TCP {
 	            }
 	            
 	            //compose a synack message
-	            
 	            TCPSegment syn_ack = new TCPSegment(TCPSegmentType.SYNACK);
 	            
-	            //try to send the synack packet and wait for ack MAX_TRIES times
-	            for(int ntries = 0; ntries < MAX_TRIES; ntries++){            	
-	            	//try to send a synack, resend if it fails
-					sockSend(syn_ack);
-					//start timed wait for ack
-					
-					try {
-						TCPSegment ack = sockRecv(timeout);
-						
-						switch(ack.getSegmentType()){
-						case ACK:
-							tcb.setState(ConnectionState.S_ESTABLISHED);
-							break;
-						default:
-							//received some other packet. Do nothing.
-							continue;
-						}
-		            	break;
-					} catch (Exception e) {
-						//do nothing; continue.
-					}
+	            //try to send it
+	            if (sendAndWaitAck(syn_ack, false)){
+	            	tcb.setState(ConnectionState.S_ESTABLISHED);
 	            }
 	            
 	            /*either:
@@ -221,20 +173,27 @@ public class TCP {
 			sockSend(ack);
         }
         
-        /**here, process received fin packet and ack it.*/
+        /**here, the process received a fin packet. handle it according to the current state.*/
         private void handleIncomingFin(){
+        	TCPSegment ack;
+        	
         	/*
         	 * if we were in established state, go to close_wait state and send an ack.
         	 * if we were already in close_wait, and receive a fin again, resend the ack since it was apparently lost.
         	 */
-        	if (tcb.getState() == ConnectionState.S_ESTABLISHED || tcb.getState() == ConnectionState.S_CLOSE_WAIT){
-	        	tcb.setState(ConnectionState.S_CLOSE_WAIT);
-	        	//send ack
-	        	TCPSegment ack = new TCPSegment(TCPSegmentType.ACK);
-				sockSend(ack);				
-        	} else if (tcb.getState() == ConnectionState.S_FIN_WAIT_2){
+        	switch(tcb.getState()){
+        	case S_ESTABLISHED:
+        		tcb.setState(ConnectionState.S_CLOSE_WAIT);
+        	case S_CLOSE_WAIT:
+        		//send ack
+	        	ack = new TCPSegment(TCPSegmentType.ACK);
+				sockSend(ack);
+				break;
+        	case S_FIN_WAIT_1:
+        		//simultaneous closing
+        	case S_FIN_WAIT_2:
         		//send last ack
-        		TCPSegment ack = new TCPSegment(TCPSegmentType.ACK);
+        		ack = new TCPSegment(TCPSegmentType.ACK);
 				sockSend(ack);
 				tcb.setState(ConnectionState.S_TIME_WAIT);
 				
@@ -243,7 +202,8 @@ public class TCP {
 				long timeExpired = 0;
 				long initialTime = System.currentTimeMillis();
 				
-				for (int timer = MSL; timer > 0; timer -= (timeExpired / 1000)){
+				//decrease timer until it hits zero
+				for (int timer = 2 * MSL; timer > 0; timer -= (timeExpired / 1000)){
 					try {
 						TCPSegment segment = sockRecv(timer);
 						if(segment.getSegmentType() == TCPSegmentType.FIN){
@@ -251,7 +211,6 @@ public class TCP {
 							ack = new TCPSegment(TCPSegmentType.ACK);
 							sockSend(ack);
 						}
-						
 					} catch (InvalidPacketException e) {
 						continue;
 					} catch (InterruptedException e) {
@@ -265,8 +224,10 @@ public class TCP {
 				}
 				//close the connection
 				tcb.setState(ConnectionState.S_CLOSED);
+				break;
+        	default:
+        		//do nothing
         	}
-        	//else, do nothing
         }
         
         private TCPSegment sockRecv(int timeout) throws InvalidPacketException, InterruptedException{
@@ -310,6 +271,7 @@ public class TCP {
         		e.printStackTrace();
         		return false;
         	}
+        	//TODO increment sequence number
         	return true;
         }
         
@@ -317,7 +279,7 @@ public class TCP {
         /**
          * wrapper for sockSend. try to send a packet and wait for the acknowledgment.
          */
-        private boolean sendAndWaitAck(TCPSegment pck) {
+        private boolean sendAndWaitAck(TCPSegment pck, boolean doWaitForSynAck) {
         	int ntried = 0;
 
         	while (true){
@@ -326,13 +288,21 @@ public class TCP {
         			return false;
         		
         		//wait for ack
-        		if (!waitForAck()){
+        		boolean hasReceived = false;
+        		
+	        	if(!doWaitForSynAck){	
+	        		hasReceived = waitForAck();
+	        	} else {
+	        		hasReceived = waitForSynAck();
+	        	}
+        		if (!hasReceived){
         			ntried++;
 					if (ntried >= MAX_TRIES)
 						return false;
         		} else {
         			return true;
         		}
+        		//wait for synack
         	}
         }
         
@@ -353,13 +323,26 @@ public class TCP {
 						break;
 					case FIN:
 						handleIncomingFin();
-						break;
 					default:
 						continue;
 					}
 				} catch (Exception e) {
 					return false;
 				}
+        	}
+        }
+        
+        /**
+         * same as waitForAck, only waits for a synack and discards data and fin packets
+         */
+        private boolean waitForSynAck(){
+        	while(true){
+        		try {
+					TCPSegment seg = sockRecv(timeout);
+					return seg.getSegmentType() == TCPSegmentType.SYNACK;
+        		} catch (Exception e) {
+        			return false;
+        		}
         	}
         }
         
@@ -458,7 +441,7 @@ public class TCP {
         			TCPSegment pck = new TCPSegment(TCPSegmentType.DATA, data);
         			
         			//send packet
-        			sendAndWaitAck(pck);
+        			sendAndWaitAck(pck, false);
         			
         		}
         		return len;
@@ -480,7 +463,7 @@ public class TCP {
         		//send fin
         		TCPSegment fin = new TCPSegment(TCPSegmentType.FIN);
         		tcb.setState(ConnectionState.S_FIN_WAIT_1);
-        		if (sendAndWaitAck(fin)){
+        		if (sendAndWaitAck(fin, false)){
         			tcb.setState(ConnectionState.S_FIN_WAIT_2);
         			return true;
         		}
@@ -492,7 +475,7 @@ public class TCP {
         		//send fin
         		fin = new TCPSegment(TCPSegmentType.FIN);
         		tcb.setState(ConnectionState.S_LAST_ACK);
-        		sendAndWaitAck(fin);
+        		sendAndWaitAck(fin, false);
         		
         		//if fin sending fails, close anyway
         		tcb.setState(ConnectionState.S_CLOSED);
