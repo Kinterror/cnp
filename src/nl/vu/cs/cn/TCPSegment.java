@@ -171,16 +171,19 @@ class TCPSegment{
 	 * @return TCPSegment deserialized from array
 	 */
 	static TCPSegment decode(byte[] array, int length){
-		int src_port = (((int) array[0]) <<8) | (int)array[1];
+		int src_port = (((int) array[0] & 0xFF) <<8) | ((int)array[1] & 0xFF);
 		
-		int dest_port = (((int) array[2]) <<8) | (int)array[3];
+		int dest_port = (((int) array[2] & 0xFF) <<8) | ((int)array[3] & 0xFF);
 		
 		long seq_nr = 0, ack_nr = 0;
+		
 		for(int i = 4; i < 8; i++){
-			seq_nr |= (long) (array[i]);
+			//you are not supposed to understand this.
+			seq_nr |= ((long) (array[i]) & 0xFF) <<(24 - 8 * (i - 4));
 		}
 		for(int i = 8; i < 12; i++){
-			ack_nr |= (long) (array[i]);
+			//here be dragons
+			ack_nr |= ((long) (array[i]) & 0xFF) <<(24 - 8 * (i - 4));
 		}
 		
 		//skip result[12]
@@ -189,9 +192,9 @@ class TCPSegment{
 		int fin = (int)(array[13] & 0x01);
 		
 		//left part of checksum, useful for debugging (Java Signedness is bothersome)
-		int c1 = ((int) array[16]) & 0x000000FF;
+		int c1 = ((int) array[16]) & 0xFF;
 		//right part
-		int c2 = ((int) array[17]) & 0x000000FF;
+		int c2 = ((int) array[17]) & 0xFF;
 		//add them together in a short
 		short checksum = (short) (c1 <<8 | c2);
 		
