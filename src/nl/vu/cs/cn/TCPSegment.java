@@ -6,14 +6,13 @@ import nl.vu.cs.cn.IP.IpAddress;
  * this class represents the TCP header fields and encode and decode operations
  */
 
-public class TCPSegment{
+class TCPSegment{
 	//ports
 	int src_port, dest_port;
 	//unused flags. See RFC 793 for more details.
 	//these fields' semantics are not supported in this implementation. They exist just for the sake of completeness.
-	int[] unused_flags = {0, 0, 0};
-	int ns, cwr, ece, urg, rst;
-	int window_size, urgent_pointer;
+	private int ns, cwr, ece, urg, rst;
+	private int window_size, urgent_pointer;
 	//used flags.
 	int ack, psh, syn, fin;
 	short checksum;
@@ -26,13 +25,13 @@ public class TCPSegment{
 	/**
 	 * all possible TCP segment types
 	 */
-	public enum TCPSegmentType{
+	enum TCPSegmentType{
 		SYN, ACK, SYNACK, FIN, DATA
 	}
 	
 	
 	//these fields are not formally a part of the TCP header; however, in our implementation they are used. 
-	public static final int HEADER_LENGTH = 20;
+	static final int HEADER_LENGTH = 20;
 	IpAddress source_ip;
 	
 	/**constructor for a segment without specified ports, checksum and seqnrs*/
@@ -103,7 +102,7 @@ public class TCPSegment{
 	 * 
 	 * @return the byte array
 	 */
-	public byte[] encode(){
+	byte[] encode(){
 		
 		//check if there is any data. If data = null: skip this.
 		int dataLength = data.length;
@@ -161,7 +160,7 @@ public class TCPSegment{
 	 * @param length of the array (might be smaller than array.length), which is at least HEADER_LENGTH
 	 * @return TCPSegment deserialized from array
 	 */
-	public static TCPSegment decode(byte[] array, int length){
+	static TCPSegment decode(byte[] array, int length){
 		int src_port = (((int) array[0]) <<8) | (int)array[1];
 		
 		int dest_port = (((int) array[2]) <<8) | (int)array[3];
@@ -260,7 +259,7 @@ public class TCPSegment{
 	 * @param dest
 	 * @return true if the checksums match
 	 */
-	public boolean validateChecksum(int source, int dest){
+	boolean validateChecksum(int source, int dest){
 		return (checksum == calculate_checksum(source, dest, IP.TCP_PROTOCOL));
 	}
 		
@@ -286,28 +285,36 @@ public class TCPSegment{
 	/**
 	 * method to check what kind of packet this is
 	 */
-	public TCPSegmentType getSegmentType(){
+	TCPSegmentType getSegmentType(){
 		return getSegmentType(syn, ack, fin);
 	}
 	
-	public int getDataLength(){
+	int getDataLength(){
 		return data.length;
 	}
 	
-	public long getSeqNr(){
+	long getSeqNr(){
 		return seq_nr;
 	}
 	
-	public long getAckNr(){
+	long getAckNr(){
 		return ack_nr;
 	}
 	
-	public void setSeqNr(long nr){
+	void setSeqNr(long nr){
 		seq_nr = nr;
 	}
 	
-	public void setAckNr(long nr){
+	void setAckNr(long nr){
 		ack_nr = nr;
+	}
+	
+	void setDestPort(int port){
+		this.dest_port = port;
+	}
+	
+	void setSrcPort(int port){
+		this.src_port = port;
 	}
 	
 	/**
@@ -326,7 +333,7 @@ public class TCPSegment{
 		return source_ip.getAddress() == ip.getAddress();
 	}
 	
-	public SocketAddress getSrcSocketAddress(){
+	SocketAddress getSrcSocketAddress(){
 		return new SocketAddress(source_ip, src_port);
 	}
 	
@@ -346,7 +353,6 @@ public class TCPSegment{
     	dataString.append("]");
     	return dataString.toString();
     }
-
 	
 	/**
 	 * Convert a TCP segment (header and data) into a String object.

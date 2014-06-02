@@ -268,7 +268,8 @@ public class TCP {
         	
         	pck.setSeqNr(tcb.getAndIncrement_seqnr(pck.getDataLength()));
         	pck.setAckNr(tcb.get_acknr());
-        	pck.dest_port = remoteAddr.getPort();
+        	pck.setDestPort(remoteAddr.getPort());
+        	pck.setSrcPort(tcb.getLocalSocketAddress().getPort());
         	
         	try{
         		send_tcp_segment(remoteAddr.getIp(), pck);
