@@ -74,7 +74,9 @@ class TCPSegment{
 		this.seq_nr = seq_nr;
 		this.ack_nr = ack_nr;
 		
-		
+		this.syn = syn;
+		this.ack = ack;
+		this.fin = fin;
 		
 		//add data
 		if(data != null){
@@ -178,7 +180,7 @@ class TCPSegment{
 		long seq_nr = 0, ack_nr = 0;
 		
 		for(int i = 4; i < 8; i++){
-			//you are not supposed to understand this.
+			//convert the four bytes into one long (not int because of signedness
 			int shift = 24 - 8 * (i - 4); //
 			
 			long intermediate = (long) (array[i] & 0xFF);
