@@ -53,7 +53,14 @@ class TCPSegment{
 	/**constructor for a segment with specified checksum*/
 	TCPSegment(int src_port, int dest_port, long seq_nr, long ack_nr,
 			TCPSegmentType st, byte[] data, short checksum){
-		
+		this(src_port, dest_port, seq_nr, ack_nr, 0, 0, 0, data, checksum);
+		setControlFlags(st);
+	}
+	
+	/** constructor with specified flags */
+	private TCPSegment(int src_port, int dest_port, long seq_nr, long ack_nr,
+			int syn, int ack, int fin, byte[] data, short checksum){
+
 		//set other flags unused by this implementation
 		cwr = 0; ece = 0; urg = 0; psh = 1; rst = 0; ns = 0; 
 		window_size = 1; urgent_pointer = 0;
@@ -67,6 +74,18 @@ class TCPSegment{
 		this.seq_nr = seq_nr;
 		this.ack_nr = ack_nr;
 		
+		
+		
+		//add data
+		if(data != null){
+			this.data = new byte[data.length];
+			for(int i = 0; i < data.length; i++){
+				this.data[i] = data[i];
+			}
+		}
+	}
+	
+	void setControlFlags(TCPSegmentType st){
 		//set flags
 		syn = ack = fin = 0;
 		
@@ -84,17 +103,7 @@ class TCPSegment{
 			fin = 1;
 			break;			
 		}
-		
-		//add data
-		if(data != null){
-			this.data = new byte[data.length];
-			for(int i = 0; i < data.length; i++){
-				this.data[i] = data[i];
-			}
-		}
 	}
-	
-	
 	
 	/**
 	 * Encode a TCP segment into a byte array.
@@ -192,7 +201,7 @@ class TCPSegment{
     	}
 		
 		return new TCPSegment(src_port, dest_port, seq_nr, ack_nr,
-    			getSegmentType(syn, ack, fin), data, checksum);
+    			syn, ack, fin, data, checksum);
 	}
 	
 	
@@ -249,8 +258,6 @@ class TCPSegment{
 		return (short) ~sum;
 	}
 	
-	
-	
 	/**
 	 * Compare two checksums to see if they match.
 	 * 
@@ -262,7 +269,10 @@ class TCPSegment{
 		return (checksum == calculate_checksum(source, dest, IP.TCP_PROTOCOL));
 	}
 		
-	private static TCPSegmentType getSegmentType(int syn, int ack, int fin){
+	/**
+	 * method to check what kind of packet this is
+	 */
+	TCPSegmentType getSegmentType(){
 		if (syn == 0 && fin == 0 && ack == 0){
 			return TCPSegmentType.DATA;
 		}
@@ -279,13 +289,6 @@ class TCPSegment{
 			return TCPSegmentType.SYNACK;
 		}
 		return null;
-	}
-	
-	/**
-	 * method to check what kind of packet this is
-	 */
-	TCPSegmentType getSegmentType(){
-		return getSegmentType(syn, ack, fin);
 	}
 	
 	int getDataLength(){
