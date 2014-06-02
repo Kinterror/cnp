@@ -127,11 +127,11 @@ class TCPSegment{
 		result[3] = (byte) dest_port;
 		//add sequence number
 		for(int i = 4; i < 8; i++){
-			result[i] = (byte) (seq_nr>>((i - 4) * 8));
+			result[i] = (byte) (seq_nr>>(24 - (i - 4) * 8));
 		}
 		//add acknowledgment number
 		for(int i = 8; i < 12; i++){
-			result[i] = (byte) (ack_nr>>((i - 8) * 8));
+			result[i] = (byte) (ack_nr>>(24 - (i - 8) * 8));
 		}
 		//add flags
 		result[12] = (byte) ((DATA_OFFSET << 4) | (byte) ns); //unused 3 bits are 0
