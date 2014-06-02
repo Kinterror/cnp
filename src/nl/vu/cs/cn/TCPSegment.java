@@ -65,9 +65,6 @@ class TCPSegment{
 		cwr = 0; ece = 0; urg = 0; psh = 1; rst = 0; ns = 0; 
 		window_size = 1; urgent_pointer = 0;
 		
-		//checksum is initially zero
-		checksum = 0;
-		
 		//set other fields
 		this.src_port = src_port;
 		this.dest_port = dest_port;
@@ -77,6 +74,8 @@ class TCPSegment{
 		this.syn = syn;
 		this.ack = ack;
 		this.fin = fin;
+		
+		this.checksum = checksum;
 		
 		//add data
 		if(data != null){
