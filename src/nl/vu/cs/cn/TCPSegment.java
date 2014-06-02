@@ -278,7 +278,7 @@ class TCPSegment{
 	boolean validateChecksum(int source, int dest){
 		return (checksum == calculate_checksum(source, dest, IP.TCP_PROTOCOL));
 	}
-		
+	
 	/**
 	 * method to check what kind of packet this is
 	 */

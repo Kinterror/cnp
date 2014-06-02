@@ -15,7 +15,7 @@ public class TCP {
 	
 	/** The port a client socket will bind to automatically. Since only one connection is allowed at a time,
 	 * only one port is needed for this. */
-	public static final int defaultClientPort = 12345;
+	public static final int DEFAULT_CLIENT_PORT = 12345;
 	
 	/** The underlying IP stack for this TCP stack. */
 	private IP ip;
@@ -56,7 +56,7 @@ public class TCP {
     	 * Construct a client socket.
     	 */
     	private Socket() {
-    		this(defaultClientPort);
+    		this(DEFAULT_CLIENT_PORT);
     		isClientSocket = true;
     	}
 
@@ -82,7 +82,7 @@ public class TCP {
         public boolean connect(IpAddress dst, int port) {
         	
         	//can't connect with a server socket or a socket with an already open connection
-        	if (!isClientSocket || tcb.getState() != ConnectionState.S_CLOSED){
+        	if (!isClientSocket || tcb.getState() != ConnectionState.S_CLOSED || port < 0 || port > 65535){
         		return false;
         	}
         	
