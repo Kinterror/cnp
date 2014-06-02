@@ -179,11 +179,15 @@ class TCPSegment{
 		
 		for(int i = 4; i < 8; i++){
 			//you are not supposed to understand this.
-			seq_nr |= ((long) (array[i]) & 0xFF) <<(24 - 8 * (i - 4));
+			int shift = 24 - 8 * (i - 4); //
+			
+			long intermediate = (long) (array[i] & 0xFF);
+			
+			seq_nr |= (intermediate<<shift);
 		}
 		for(int i = 8; i < 12; i++){
 			//here be dragons
-			ack_nr |= ((long) (array[i]) & 0xFF) <<(24 - 8 * (i - 4));
+			ack_nr |= ((long) (array[i]) & 0xFF) <<(24 - 8 * (i - 8));
 		}
 		
 		//skip result[12]
