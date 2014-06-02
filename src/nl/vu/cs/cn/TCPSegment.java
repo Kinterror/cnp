@@ -29,24 +29,30 @@ class TCPSegment{
 		SYN, ACK, SYNACK, FIN, DATA
 	}
 	
-	
 	//these fields are not formally a part of the TCP header; however, in our implementation they are used. 
 	static final int HEADER_LENGTH = 20;
 	IpAddress source_ip;
-	
-	/**constructor for a segment without specified ports, checksum and seqnrs*/
-	TCPSegment(TCPSegmentType st, byte[] data){
-		this(0, 0, 0, 0, st, data);
-	}
 	
 	/**constructor for a control segment with no data or otherwise specified fields*/
 	TCPSegment(TCPSegmentType st){
 		this(st, new byte[0]);
 	}
 	
-	/**constructor for a segment without specified checksum*/
+	/**constructor for a segment without specified ports, checksum and seqnrs*/
+	TCPSegment(TCPSegmentType st, byte[] data){
+		this(0, 0, 0, 0, st, data);
+	}
+	
+	/**constructor without checksum*/
 	TCPSegment(int src_port, int dest_port, long seq_nr, long ack_nr,
 			TCPSegmentType st, byte[] data){
+		this(src_port, dest_port, seq_nr, ack_nr,
+    			st, data, (short) 0);
+	}
+	
+	/**constructor for a segment with specified checksum*/
+	TCPSegment(int src_port, int dest_port, long seq_nr, long ack_nr,
+			TCPSegmentType st, byte[] data, short checksum){
 		
 		//set other flags unused by this implementation
 		cwr = 0; ece = 0; urg = 0; psh = 1; rst = 0; ns = 0; 
@@ -86,16 +92,9 @@ class TCPSegment{
 				this.data[i] = data[i];
 			}
 		}
-		
 	}
 	
-	/**constructor with checksum*/
-	TCPSegment(int src_port, int dest_port, long seq_nr, long ack_nr,
-			TCPSegmentType st, byte[] data, short checksum){
-		this(src_port, dest_port, seq_nr, ack_nr,
-    			st, data);
-		this.checksum = checksum;
-	}
+	
 	
 	/**
 	 * Encode a TCP segment into a byte array.
