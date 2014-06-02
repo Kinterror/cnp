@@ -100,9 +100,14 @@ public class TCP {
         	//send it and wait for a synack
         	tcb.setState(ConnectionState.S_SYN_SENT);
         	if (sendAndWaitAck(syn_pck, true)){
+        		//send ack
+        		TCPSegment ack = new TCPSegment(TCPSegmentType.ACK);
+        		sockSend(ack);
+        		
         		tcb.setState(ConnectionState.S_ESTABLISHED);
         		return true;
         	} else {
+        		tcb.setState(ConnectionState.S_CLOSED);
         		return false;
         	}
         }	
@@ -323,11 +328,15 @@ public class TCP {
 						break;
 					case FIN:
 						handleIncomingFin();
+					case SYNACK:
+						//TODO what if ack of 3wh was lost? Compare current expected sequence number to the initial.
 					default:
 						continue;
 					}
-				} catch (Exception e) {
+				} catch (InterruptedException e) {
 					return false;
+				} catch (InvalidPacketException i){
+					//Discard it
 				}
         	}
         }
@@ -339,9 +348,14 @@ public class TCP {
         	while(true){
         		try {
 					TCPSegment seg = sockRecv(timeout);
-					return seg.getSegmentType() == TCPSegmentType.SYNACK;
-        		} catch (Exception e) {
+					if ( seg.getSegmentType() == TCPSegmentType.SYNACK){
+						tcb.initClient(seg);
+						return true;
+					}
+        		} catch (InterruptedException e) {
         			return false;
+        		} catch (InvalidPacketException i) {
+        			continue;
         		}
         	}
         }
@@ -381,6 +395,8 @@ public class TCP {
 								return sock_buf.deBuffer(buf, offset, maxlen);
 							}							
 							break;
+						case SYNACK:
+							//TODO was the ack lost?
 						default:
 							//discard the packet
 							continue;

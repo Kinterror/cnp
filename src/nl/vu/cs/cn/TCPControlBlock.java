@@ -48,6 +48,10 @@ class TCPControlBlock{
 		set_acknr(s.seq_nr);
 		setState(ConnectionState.S_SYN_RCVD);
 	}
+	
+	void initClient(TCPSegment s){
+		set_acknr(s.seq_nr);
+	}
 		
 	void setState(ConnectionState s){
 		this.state = s;
@@ -110,6 +114,7 @@ class TCPControlBlock{
 	}
 	
 	public boolean isValidSegment(TCPSegment pck) {
+		//TODO check sequence number
 		return 	pck.hasDestPort(local_port) &&
 				pck.hasSrcIp(remote_ip_addr) &&
 				pck.hasSrcPort(remote_port);
