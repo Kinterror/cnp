@@ -27,7 +27,7 @@ public class TCPSegment{
 	 * all possible TCP segment types
 	 */
 	public enum TCPSegmentType{
-		SYN, ACK, SYNACK, FIN, DATA, FINACK
+		SYN, ACK, SYNACK, FIN, DATA
 	}
 	
 	
@@ -72,8 +72,6 @@ public class TCPSegment{
 			syn = 1;
 		case DATA:
 			break;
-		case FINACK:
-			fin = 1;
 		case ACK:
 			ack = 1;
 			break;
@@ -281,9 +279,6 @@ public class TCPSegment{
 		}
 		if (syn == 1 && ack == 1 && fin == 0){
 			return TCPSegmentType.SYNACK;
-		}
-		if (syn == 0 && ack == 1 && fin == 1){
-			return TCPSegmentType.FINACK;
 		}
 		return null;
 	}
