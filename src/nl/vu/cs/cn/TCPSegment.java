@@ -11,8 +11,8 @@ class TCPSegment{
 	int src_port, dest_port;
 	//unused flags. See RFC 793 for more details.
 	//these fields' semantics are not supported in this implementation. They exist just for the sake of completeness.
-	private int ns, cwr, ece, urg, rst;
-	private int window_size, urgent_pointer;
+	int ns, cwr, ece, urg, rst;
+	int window_size, urgent_pointer;
 	//used flags.
 	int ack, psh, syn, fin;
 	short checksum;

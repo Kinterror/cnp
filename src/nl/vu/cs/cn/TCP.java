@@ -552,7 +552,7 @@ public class TCP {
      * @param packet
      * @throws IOException 
      */
-	private void send_tcp_segment(IpAddress destination, TCPSegment p) throws IOException{
+	void send_tcp_segment(IpAddress destination, TCPSegment p) throws IOException{
     	//get integer value of IPAddress
 		int destIpInt = destination.getAddress();
 		
@@ -582,7 +582,7 @@ public class TCP {
 	 * @throws InterruptedException
 	 * @throws InvalidPacketException
      */
-    private TCPSegment recv_tcp_segment(int timeout) throws InvalidPacketException, InterruptedException{
+    TCPSegment recv_tcp_segment(int timeout) throws InvalidPacketException, InterruptedException{
     	Packet ip_packet = new Packet();
     	try {
 	    	if(timeout > 0){
