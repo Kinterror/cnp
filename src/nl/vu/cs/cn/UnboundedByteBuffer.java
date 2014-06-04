@@ -4,7 +4,7 @@ import java.util.Iterator;
 import java.util.LinkedList;
 
 /**
- * class which represends the receive buffer. Internally represented using a linked list, it is possible to read or
+ * class which represents the receive buffer. Internally represented using a linked list, it is possible to read or
  * write any number of bytes from the buffer and return them in a byte array.
  * @author boris
  *
@@ -16,7 +16,7 @@ public class UnboundedByteBuffer {
 	/**
 	 * adds data to the buffer
 	 */
-	public void buffer(byte[] arr){
+	public synchronized void buffer(byte[] arr){
 		list.add(arr);
 	}
 	
@@ -27,7 +27,7 @@ public class UnboundedByteBuffer {
 	 * @param nBytes
 	 * @return the number of bytes read from the buffer
 	 */
-	public int deBuffer(byte[] arr, int offset, int nBytes){
+	public synchronized int deBuffer(byte[] arr, int offset, int nBytes){
 		int i = offset, nread = 0;
 		
 		//check if the buffer is too small. If so, fill the buffer instead of putting in nBytes bytes.
@@ -73,7 +73,7 @@ public class UnboundedByteBuffer {
 		return nread;
 	}
 	
-	public int length(){
+	public synchronized int length(){
 		int res = 0;
 		
 		Iterator<byte[]> in = list.descendingIterator();

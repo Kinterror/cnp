@@ -208,7 +208,7 @@ public class TCP {
 				long initialTime = System.currentTimeMillis();
 				
 				//decrease timer until it hits zero
-				for (int timer = 2 * MSL; timer > 0; timer -= (timeExpired / 1000)){
+				for (int timer = 2 * MSL; timer >= 0; timer -= (timeExpired / 1000)){
 					try {
 						TCPSegment segment = sockRecv(timer);
 						if(segment.getSegmentType() == TCPSegmentType.FIN){
@@ -235,7 +235,7 @@ public class TCP {
         	}
         }
         
-        private TCPSegment sockRecv(int timeout) throws InvalidPacketException, InterruptedException{
+        private synchronized TCPSegment sockRecv(int timeout) throws InvalidPacketException, InterruptedException{
         	TCPSegment pck;
         	
         	while(true){
@@ -249,7 +249,7 @@ public class TCP {
         	return pck;
         }
         
-        private TCPSegment sockRecv() throws InvalidPacketException{
+        private synchronized TCPSegment sockRecv() throws InvalidPacketException{
         	try{
         		return sockRecv(0);
         	} catch (InterruptedException e){
@@ -263,7 +263,7 @@ public class TCP {
          * @param pck
          */
         
-        private boolean sockSend(TCPSegment pck) {
+        private synchronized boolean sockSend(TCPSegment pck) {
         	SocketAddress remoteAddr = tcb.getRemoteSocketAddress();
         	
         	pck.setSeqNr(tcb.getAndIncrement_seqnr(pck.getDataLength()));
@@ -321,6 +321,7 @@ public class TCP {
         	while(true){
         		try {
 					TCPSegment seg = sockRecv(timeout);
+					
 					switch(seg.getSegmentType()){
 					case ACK:
 						return true;
@@ -332,7 +333,7 @@ public class TCP {
 					case SYNACK:
 						//TODO what if ack of 3wh was lost? Compare current expected sequence number to the initial.
 					default:
-						continue;
+						//continue
 					}
 				} catch (InterruptedException e) {
 					return false;
@@ -398,6 +399,8 @@ public class TCP {
 							break;
 						case SYNACK:
 							//TODO was the ack lost?
+						case ACK:
+							//TODO check seqnr, 
 						default:
 							//discard the packet
 							continue;
