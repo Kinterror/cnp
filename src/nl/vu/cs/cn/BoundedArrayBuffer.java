@@ -8,14 +8,14 @@ import java.util.LinkedList;
  * @author boris
  *
  */
-public class BoundedByteBuffer {
+public class BoundedArrayBuffer {
 	
 	private LinkedList<byte[]> list;
 	
 	private int length;
 	private int max_len;
 
-	public BoundedByteBuffer(int max_len){
+	public BoundedArrayBuffer(int max_len){
 		list = new LinkedList<byte[]>();
 		this.max_len = max_len;
 		this.length = 0;
@@ -27,7 +27,7 @@ public class BoundedByteBuffer {
 	 */
 	public synchronized void buffer(byte[] arr) throws FullCollectionException {
 		if (arr.length + length > max_len){
-			throw new FullCollectionException("BoundedByteBuffer");
+			throw new FullCollectionException("BoundedArrayBuffer");
 		}
 		
 		list.add(arr);
