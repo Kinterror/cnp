@@ -53,7 +53,7 @@ public class TCP {
     	boolean isClientSocket;
     	
 		TCPControlBlock tcb;
-		private BoundedArrayBuffer sock_buf;
+		private BoundedByteBuffer sock_buf;
 		
     	/**
     	 * Construct a client socket.
@@ -72,7 +72,7 @@ public class TCP {
         	tcb = new TCPControlBlock();
         	tcb.setLocalSocketAddress(new SocketAddress(ip.getLocalAddress(), port));
         	
-        	sock_buf = new BoundedArrayBuffer(BUFFER_SIZE);
+        	sock_buf = new BoundedByteBuffer(BUFFER_SIZE);
         }
 
 		/**
