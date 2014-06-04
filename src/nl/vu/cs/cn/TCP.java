@@ -403,7 +403,13 @@ public class TCP {
 							handleIncomingFin();
 							//in case they also have closed the connection, return the last bytes in the buffer
 							if (tcb.getState() == ConnectionState.S_CLOSED){
-								return sock_buf.deBuffer(buf, offset, maxlen);
+								try {
+									return sock_buf.deBuffer(buf, offset, maxlen);
+								} catch (EmptyCollectionException e) {
+									// TODO Auto-generated catch block
+									e.printStackTrace();
+									return 0;
+								}
 							}							
 							break;
 						case SYNACK:
@@ -424,7 +430,13 @@ public class TCP {
 					}
         		}
         	case S_CLOSE_WAIT: //they have already closed the connection, or we received enough data
-        		return sock_buf.deBuffer(buf, offset, maxlen);
+        		try {
+					return sock_buf.deBuffer(buf, offset, maxlen);
+				} catch (EmptyCollectionException e) {
+					// TODO Auto-generated catch block
+					e.printStackTrace();
+					return 0;
+				}
         	default:
         		return -1;
         	}
