@@ -41,7 +41,7 @@ public class TCP {
 	public static final int MAX_TCPIP_SEGMENT_SIZE = 8192;
 
 	/** Size of the send and receive buffer */
-	public static final int BUFFER_SIZE = 128;
+	public static final int BUFFER_SIZE = 1048576; // 1MB
 	
     /**
      * This class represents a TCP socket.

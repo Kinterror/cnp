@@ -5,8 +5,7 @@ import java.util.LinkedList;
 /**
  * class which represents the receive buffer. Internally represented using a linked list, it is possible to read or
  * write any number of bytes from the buffer and return them in a byte array.
- * @author boris
- *
+ * @author Boris Mulder
  */
 public class BoundedByteBuffer {
 	
@@ -21,9 +20,10 @@ public class BoundedByteBuffer {
 		this.length = 0;
 	}
 	
-	
 	/**
-	 * adds data to the buffer
+	 * Adds bytes to the buffer
+	 * @param arr
+	 * @throws FullCollectionException
 	 */
 	public synchronized void buffer(byte[] arr) throws FullCollectionException {
 		if (arr.length + length > max_len){
@@ -37,56 +37,56 @@ public class BoundedByteBuffer {
 	/**
 	 * tries to read n bytes from the socket buffer. If it contains less than n bytes, all bytes are returned
 	 * and the number of bytes actually read.
-	 * @param arr
+	 * @param array
+	 * @param offset the offset on which to start writing to the array
 	 * @param nBytes
 	 * @return the number of bytes read from the buffer
 	 */
-	public synchronized int deBuffer(byte[] arr, int offset, int nBytes){
+	public synchronized int deBuffer(byte[] array, int offset, int nBytes){
 		int i = offset, nread = 0;
 		
-		//check if the buffer is too small. If so, fill the buffer instead of putting in nBytes bytes.
-		int n;
-		if (( n = arr.length - offset) < nBytes){
+		//do not bother to read 0 or less bytes
+		if(nBytes <= 0){
+			return 0;
+		}
+		
+		//check if the array is too small. If so, fill the buffer instead of putting in nBytes bytes.
+		int n = array.length - offset;
+		if (n < nBytes){
 			nBytes = n;
 		}
 		
-		//remove head of list
-		byte[] in = list.remove();
-		length -= in.length;
-	
-		while (in.length <= nBytes){
-			//we want more bytes then there are in the first element, so get the first element and check again
-			for(int j = 0; j < in.length; j++){
-				arr[i] = in[j];
-				i++;
-			}
-			nBytes -= in.length;
-			nread += in.length;
+		byte[] in;
+		int j;
+		
+		do{
+			//remove head of list
 			in = list.remove();
 			length -= in.length;
+			
+			//copy data into array
+			for(j = 0; j < in.length && j < nBytes; j++){
+				array[i] = in[j];
+				i++;
+			}
+			
+			nBytes -= j;
+			nread += j;
 		}
+		while (nBytes > 0); //while there are still bytes to be read from the buffer
 		
-		//do we still have to read?
-		if (nBytes == 0){
-			return nread;
-		}
+		//if we didn't copy all bytes
+		if (in.length > j){
+			//add the remaining bytes back to the list
+			byte[] temp = new byte[in.length - j];
+			for(int k = 0; k < temp.length; k++){
+				temp[k] = in[k + j];
+			}
+			//add the array as first element
+			list.addFirst(temp);
+			length += temp.length;
 		
-		//copy remaining bytes into array
-		for(int j = 0; j < nBytes; j++){
-			arr[i] = in[j];
-			i++;
 		}
-		nread += nBytes;
-		
-		//add the remaining bytes to the list
-		byte[] temp = new byte[in.length - nBytes];
-		for(int j = 0; j < temp.length; j++){
-			temp[j] = in[j + nBytes];
-		}
-		//replace the first element with the new array
-		list.addFirst(temp);
-		length += temp.length;
-	
 		return nread;
 	}
 	
