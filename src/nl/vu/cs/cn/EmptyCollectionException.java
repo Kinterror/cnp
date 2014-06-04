@@ -6,7 +6,7 @@ package nl.vu.cs.cn;
 //Represents the situation in which a collection is empty.
 //********************************************************************
 
-public class EmptyCollectionException extends RuntimeException
+public class EmptyCollectionException extends Exception
 {
 	private static final long serialVersionUID = 6771728668176760251L;
 

@@ -39,6 +39,9 @@ public class TCP {
 	
 	/**the maximum size (bytes) of any packet sent through the ip layer*/
 	public static final int MAX_TCPIP_SEGMENT_SIZE = 8192;
+
+	/** Size of the send and receive buffer */
+	public static final int BUFFER_SIZE = 128;
 	
     /**
      * This class represents a TCP socket.
@@ -50,7 +53,7 @@ public class TCP {
     	boolean isClientSocket;
     	
 		TCPControlBlock tcb;
-		private UnboundedByteBuffer sock_buf;
+		private BoundedByteBuffer sock_buf;
 		
     	/**
     	 * Construct a client socket.
@@ -69,7 +72,7 @@ public class TCP {
         	tcb = new TCPControlBlock();
         	tcb.setLocalSocketAddress(new SocketAddress(ip.getLocalAddress(), port));
         	
-        	sock_buf = new UnboundedByteBuffer();
+        	sock_buf = new BoundedByteBuffer(BUFFER_SIZE);
         }
 
 		/**
@@ -167,15 +170,21 @@ public class TCP {
         }
         
         /**
-         * buffer the received data and send an ack
+         * buffer the received data and send an ack if the buffer is not full
          */
         private void handleData(TCPSegment seg){
-        	//put the data at the end of the buffer
-        	sock_buf.buffer(seg.data);
+        	try {
+            	//put the data at the end of the buffer
+				sock_buf.buffer(seg.data);
+				
+				//send ack
+				TCPSegment ack = new TCPSegment(TCPSegmentType.ACK);
+				sockSend(ack);
+				
+			} catch (FullCollectionException e) {
+				e.printStackTrace();
+			}
         	
-        	//send ack
-        	TCPSegment ack = new TCPSegment(TCPSegmentType.ACK);
-			sockSend(ack);
         }
         
         /**here, the process received a fin packet. handle it according to the current state.*/

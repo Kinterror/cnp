@@ -1,6 +1,6 @@
 package nl.vu.cs.cn;
 
-public class FullCollectionException extends RuntimeException{
+public class FullCollectionException extends Exception{
 
 	/**
 	 * 

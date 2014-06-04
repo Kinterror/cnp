@@ -22,7 +22,7 @@ class TCPControlBlock{
 		S_CLOSED, S_LISTEN, S_SYN_SENT, S_SYN_RCVD, S_ESTABLISHED,
 		S_FIN_WAIT_1, S_FIN_WAIT_2, S_CLOSE_WAIT, S_LAST_ACK, S_TIME_WAIT
 	}
-	
+		
 	private ConnectionState state;
 	private IpAddress local_ip_addr;
 	private IpAddress remote_ip_addr;
@@ -30,13 +30,13 @@ class TCPControlBlock{
 	private int remote_port;
 	private long our_sequence_num;
 	private long our_expected_ack;
-	
+
 	TCPControlBlock(){
 		state = ConnectionState.S_CLOSED;
 		our_sequence_num = our_expected_ack = 0;
 		local_port = 0;
 		remote_port = 0;
-		
+
 		rand = new Random();
 	}
 	
@@ -113,11 +113,10 @@ class TCPControlBlock{
 		return our_expected_ack;
 	}
 	
-	public boolean isValidSegment(TCPSegment pck) {
+	boolean isValidSegment(TCPSegment pck) {
 		//TODO check sequence number
 		return 	pck.hasDestPort(local_port) &&
 				pck.hasSrcIp(remote_ip_addr) &&
 				pck.hasSrcPort(remote_port);
 	}
-	
 }

@@ -1,6 +1,5 @@
 package nl.vu.cs.cn;
 
-import java.util.Iterator;
 import java.util.LinkedList;
 
 /**
@@ -9,15 +8,30 @@ import java.util.LinkedList;
  * @author boris
  *
  */
-public class UnboundedByteBuffer {
+public class BoundedByteBuffer {
 	
 	private LinkedList<byte[]> list;
+	
+	private int length;
+	private int max_len;
 
+	public BoundedByteBuffer(int max_len){
+		list = new LinkedList<byte[]>();
+		this.max_len = max_len;
+		this.length = 0;
+	}
+	
+	
 	/**
 	 * adds data to the buffer
 	 */
-	public synchronized void buffer(byte[] arr){
+	public synchronized void buffer(byte[] arr) throws FullCollectionException {
+		if (arr.length + length > max_len){
+			throw new FullCollectionException("BoundedByteBuffer");
+		}
+		
 		list.add(arr);
+		length += arr.length;
 	}
 	
 	/**
@@ -38,6 +52,7 @@ public class UnboundedByteBuffer {
 		
 		//remove head of list
 		byte[] in = list.remove();
+		length -= in.length;
 	
 		while (in.length <= nBytes){
 			//we want more bytes then there are in the first element, so get the first element and check again
@@ -48,6 +63,7 @@ public class UnboundedByteBuffer {
 			nBytes -= in.length;
 			nread += in.length;
 			in = list.remove();
+			length -= in.length;
 		}
 		
 		//do we still have to read?
@@ -69,19 +85,16 @@ public class UnboundedByteBuffer {
 		}
 		//replace the first element with the new array
 		list.addFirst(temp);
+		length += temp.length;
 	
 		return nread;
 	}
 	
 	public synchronized int length(){
-		int res = 0;
-		
-		Iterator<byte[]> in = list.descendingIterator();
-		while(in.hasNext()){
-			byte[] temp = in.next();
-			res += temp.length;
-		}
-		
-		return res;
+		return length;
+	}
+	
+	public synchronized boolean isEmpty(){
+		return (length == 0);
 	}
 }
