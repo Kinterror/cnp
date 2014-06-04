@@ -61,7 +61,7 @@ public class BoundedByteBuffer {
 		
 		do{
 			//remove head of list
-			in = list.remove();
+			in = list.removeFirst();
 			length -= in.length;
 			
 			//copy data into array
