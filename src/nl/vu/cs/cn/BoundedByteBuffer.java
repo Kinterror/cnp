@@ -43,11 +43,11 @@ public class BoundedByteBuffer {
 	 * @return the number of bytes read from the buffer
 	 * @throws EmptyCollectionException 
 	 */
-	public synchronized int deBuffer(byte[] array, int offset, int nBytes) throws EmptyCollectionException{
+	public synchronized int deBuffer(byte[] array, int offset, int nBytes) {
 		int i = offset, nread = 0;
 		
 		//do not bother to read 0 or less bytes
-		if(nBytes <= 0){
+		if(nBytes <= 0 || length <= 0){
 			return 0;
 		}
 		
@@ -62,12 +62,7 @@ public class BoundedByteBuffer {
 		
 		do{
 			//remove head of list
-			try{
-				in = list.removeFirst();
-			} catch (Exception e){
-				throw new EmptyCollectionException(e.getMessage());
-			}
-			
+			in = list.removeFirst();
 			length -= in.length;
 			
 			//copy data into array
@@ -78,6 +73,12 @@ public class BoundedByteBuffer {
 			
 			nBytes -= j;
 			nread += j;
+			
+			//if there are no bytes left
+			if (length <= 0){
+				break;
+			}
+			
 		}
 		while (nBytes > 0); //while there are still bytes to be read from the buffer
 		
