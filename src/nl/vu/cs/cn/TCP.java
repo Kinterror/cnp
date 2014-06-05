@@ -43,6 +43,8 @@ public class TCP {
 	/** Size of the send and receive buffer */
 	public static final int BUFFER_SIZE = 1048576; // 1MB
 	
+	
+	
     /**
      * This class represents a TCP socket.
      *
@@ -53,7 +55,11 @@ public class TCP {
     	boolean isClientSocket;
     	
 		TCPControlBlock tcb;
-		private BoundedByteBuffer sock_buf;
+		private BoundedByteBuffer recv_buf;
+		private BoundedByteBuffer send_buf;
+		
+		private volatile boolean isWaitingForAck;
+		private Object waitingForAckMonitor;
 		
     	/**
     	 * Construct a client socket.
@@ -69,10 +75,13 @@ public class TCP {
     	 */
         private Socket(int port) {
         	isClientSocket = false;
+        	isWaitingForAck = false;
+        	waitingForAckMonitor = new Object();
         	tcb = new TCPControlBlock();
         	tcb.setLocalSocketAddress(new SocketAddress(ip.getLocalAddress(), port));
         	
-        	sock_buf = new BoundedByteBuffer(BUFFER_SIZE);
+        	recv_buf = new BoundedByteBuffer(BUFFER_SIZE);
+        	send_buf = new BoundedByteBuffer(BUFFER_SIZE);
         }
 
 		/**
@@ -108,6 +117,8 @@ public class TCP {
         		sockSend(ack);
         		
         		tcb.setState(ConnectionState.S_ESTABLISHED);
+        		new ReceiverThread().run();
+            	new SenderThread().run();
         		return true;
         	} else {
         		tcb.setState(ConnectionState.S_CLOSED);
@@ -159,6 +170,9 @@ public class TCP {
 	            //try to send it
 	            if (sendAndWaitAck(syn_ack, false)){
 	            	tcb.setState(ConnectionState.S_ESTABLISHED);
+	            	new ReceiverThread().run();
+	            	new SenderThread().run();
+	            	return;
 	            }
 	            
 	            /*either:
@@ -175,7 +189,7 @@ public class TCP {
         private void handleData(TCPSegment seg){
         	try {
             	//put the data at the end of the buffer
-				sock_buf.buffer(seg.data);
+				recv_buf.buffer(seg.data);
 				
 				//send ack
 				TCPSegment ack = new TCPSegment(TCPSegmentType.ACK);
@@ -386,45 +400,25 @@ public class TCP {
         	case S_ESTABLISHED:
         	case S_FIN_WAIT_1:
         	case S_FIN_WAIT_2:
-        		
-        		/*check if there are maxlen bytes in the buffer. If not, receive packets until we have enough.*/
-        		while(sock_buf.length() < maxlen){
-        		
-	        		try {
-						//receive a packet
-	        			TCPSegment seg = sockRecv();
+        		synchronized(recv_buf){
+	        		/*check if there are maxlen bytes in the buffer. If not, block until enough data is available.*/
+	        		while(recv_buf.length() < maxlen){
+	        			//wait for the buffer to become filled again
+	        			try {
+							recv_buf.wait(1000);
+						} catch (InterruptedException e) { e.printStackTrace(); }
 	        			
-	        			switch(seg.getSegmentType()){
-						case DATA:
-							//we got what we wanted
-							handleData(seg);
-							break;
-						case FIN: /*handle closing*/
-							handleIncomingFin();
-							//in case they also have closed the connection, return the last bytes in the buffer
-							if (tcb.getState() == ConnectionState.S_CLOSED){
-								return sock_buf.deBuffer(buf, offset, maxlen);
-							}							
-							break;
-						case SYNACK:
-							//TODO was the ack lost?
-						case ACK:
-							//TODO check seqnr, 
-						default:
-							//discard the packet
-							continue;
-						}
-	        			
-					} catch (InvalidPacketException e) {
-						try {
-							Thread.sleep(1000);
-						} catch (InterruptedException e1) {e1.printStackTrace();} //do nothing
-						//wait for packet to arrive again
-						continue;
-					}
+	        			//check if the connection wasn't closed in the meantime
+	        			if (tcb.getState() == ConnectionState.S_CLOSE_WAIT ||
+	        					tcb.getState() == ConnectionState.S_CLOSED){
+	        				break;
+	        			}
+	        		}
+	        		return recv_buf.deBuffer(buf, offset, maxlen);
         		}
         	case S_CLOSE_WAIT: //they have already closed the connection, or we received enough data
-        		return sock_buf.deBuffer(buf, offset, maxlen);
+        	case S_CLOSED:
+        		return recv_buf.deBuffer(buf, offset, maxlen);
         	default:
         		return -1;
         	}
@@ -451,7 +445,7 @@ public class TCP {
         		}
         		int bytesRemaining = len;
         		
-        		//while there are still bytes to write, split data into packets and send them.
+        		//while there are still bytes to write, split data into processable sizes and buffer them.
         		while(bytesRemaining > 0){
         			byte[] data;
         			if(bytesRemaining >= max_data_len){
@@ -462,22 +456,23 @@ public class TCP {
         				data = new byte[bytesRemaining];
         				bytesRemaining = 0;
         			}
+        			//copy the bytes into a new buffer
         			for(int i = 0; i < data.length; i++){
         				data[i] = buf[offset];
         				offset++;
         			}
-        			//create new packet
-        			TCPSegment pck = new TCPSegment(TCPSegmentType.DATA, data);
-        			
-        			//send packet
-        			sendAndWaitAck(pck, false);
-        			
+        			try {
+						send_buf.buffer(data);
+						send_buf.notify();
+					} catch (FullCollectionException e) {
+						//no more bytes are written
+						break;
+					}
         		}
         		return len;
         	default:
         		return -1;
         	}
-            
         }
 
         /**
@@ -513,6 +508,84 @@ public class TCP {
         		Log.e("close() error", "can't close a non-open socket");
         		return false;
         	}
+        }
+        
+        private class SenderThread implements Runnable {
+        	public void run() {
+				//only send packets it the connections hasn't been closed yet
+				while(tcb.getState() == ConnectionState.S_ESTABLISHED || 
+						tcb.getState() == ConnectionState.S_CLOSE_WAIT){
+					if (!send_buf.isEmpty()){
+						
+						//create a new segment from the buffer
+						byte[] data = new byte[MAX_TCPIP_SEGMENT_SIZE];
+						send_buf.deBuffer(data, 0, MAX_TCPIP_SEGMENT_SIZE);
+						TCPSegment seg = new TCPSegment(TCPSegmentType.DATA, data);
+						
+						int ntries = 0;
+						
+						do {
+							sockSend(seg);
+							isWaitingForAck = true;
+							/*there's an innocent race condition here that makes us lose one second
+							 * if this thread gets preempted here and the receive thread receives the
+							 * packet and calls notify before this thread has entered wait state.
+							 */
+							try {
+								//wait until the receiver thread receives an ack
+								waitingForAckMonitor.wait(1000);
+							} catch (InterruptedException e) { e.printStackTrace(); }
+							ntries++;
+						} 
+						while (ntries < MAX_TRIES && isWaitingForAck);
+						
+						//check if ack was received or timeout
+						if (isWaitingForAck) {
+							Log.e("Connection broken", "number of retries expired for ack");
+							System.exit(-1);
+						}
+					} else {
+						try {
+							send_buf.wait(1000);
+						} catch (InterruptedException e) { e.printStackTrace(); }
+					}
+				}
+			}
+        }
+        
+        private class ReceiverThread implements Runnable {
+			
+        	public void run() {
+				while (tcb.getState() == ConnectionState.S_ESTABLISHED || 
+						tcb.getState() == ConnectionState.S_FIN_WAIT_1 ||
+						tcb.getState() == ConnectionState.S_FIN_WAIT_2){ 
+				try {
+					TCPSegment seg = sockRecv();
+					switch(seg.getSegmentType()){
+					case DATA:
+						handleData(seg);
+						recv_buf.notifyAll();
+						break;
+					case ACK:
+						//notify the sender thread waiting for an ACK
+						if (isWaitingForAck){
+							isWaitingForAck = false;
+							waitingForAckMonitor.notify();
+						}
+						break;
+					case FIN:
+						handleIncomingFin();
+						break;
+					case SYNACK:
+						//TODO handle synack-ack loss
+					default:
+						//do nothing
+					}
+				} catch (InvalidPacketException e) {
+					//discard packet
+				}
+				}
+			}
         }
     }
 
