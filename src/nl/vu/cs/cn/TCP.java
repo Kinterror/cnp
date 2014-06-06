@@ -150,18 +150,14 @@ public class TCP {
 	        	TCPSegment syn_pck;
 	        	
 	            while (tcb.getState() == ConnectionState.S_LISTEN){
-		        	try {
-		            	//receive a packet from the network
-						syn_pck = sockRecv();
-						if(syn_pck.getSegmentType() == TCPSegmentType.SYN)
-						{
-							//initialize the connection state to S_SYN_RCVD
-							tcb.initServer(syn_pck);
-						}
-						//else, discard it and listen again.
-					} catch (InvalidPacketException e) {
-						//wait for packet to arrive again.
+	            	//receive a packet from the network
+					syn_pck = sockRecv();
+					if(syn_pck.getSegmentType() == TCPSegmentType.SYN)
+					{
+						//initialize the connection state to S_SYN_RCVD
+						tcb.initServer(syn_pck);
 					}
+					//else, discard it and listen again.
 	            }
 	            
 	            //compose a synack message
@@ -239,8 +235,6 @@ public class TCP {
 							ack = new TCPSegment(TCPSegmentType.ACK);
 							sockSend(ack);
 						}
-					} catch (InvalidPacketException e) {
-						continue;
 					} catch (InterruptedException e) {
 						break;
 					} finally {
@@ -258,21 +252,24 @@ public class TCP {
         	}
         }
         
-        private synchronized TCPSegment sockRecv(int timeout) throws InvalidPacketException, InterruptedException{
+        private synchronized TCPSegment sockRecv(int timeout) throws InterruptedException{
         	TCPSegment pck;
         	
         	while(true){
-	        	pck = recv_tcp_segment(timeout);
-	        	if(tcb.isValidSegment(pck)){
-	        		break;
+	        	try{
+	        		pck = recv_tcp_segment(timeout);
+		        	if(tcb.isValidSegment(pck)){
+		        		//TODO tcb.getAndIncrement_acknr(pck.getDataLength());
+		        		break;
+		        	}
+	        	} catch (InvalidPacketException e) {
+	        		//discard it?
 	        	}
         	}
-        	
-        	//TODO tcb.getAndIncrement_acknr(pck.getDataLength());
         	return pck;
         }
         
-        private synchronized TCPSegment sockRecv() throws InvalidPacketException{
+        private synchronized TCPSegment sockRecv() {
         	try{
         		return sockRecv(0);
         	} catch (InterruptedException e){
@@ -360,8 +357,6 @@ public class TCP {
 					}
 				} catch (InterruptedException e) {
 					return false;
-				} catch (InvalidPacketException i){
-					//Discard it
 				}
         	}
         }
@@ -379,8 +374,6 @@ public class TCP {
 					}
         		} catch (InterruptedException e) {
         			return false;
-        		} catch (InvalidPacketException i) {
-        			continue;
         		}
         	}
         }
@@ -559,7 +552,6 @@ public class TCP {
 				while (tcb.getState() == ConnectionState.S_ESTABLISHED || 
 						tcb.getState() == ConnectionState.S_FIN_WAIT_1 ||
 						tcb.getState() == ConnectionState.S_FIN_WAIT_2){ 
-				try {
 					TCPSegment seg = sockRecv();
 					switch(seg.getSegmentType()){
 					case DATA:
@@ -581,9 +573,6 @@ public class TCP {
 					default:
 						//do nothing
 					}
-				} catch (InvalidPacketException e) {
-					//discard packet
-				}
 				}
 			}
         }
