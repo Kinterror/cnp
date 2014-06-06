@@ -117,8 +117,8 @@ public class TCP {
         		sockSend(ack);
         		
         		tcb.setState(ConnectionState.S_ESTABLISHED);
-        		new ReceiverThread().run();
-            	new SenderThread().run();
+        		new Thread(new ReceiverThread()).start();
+            	new Thread(new SenderThread()).start();
         		return true;
         	} else {
         		tcb.setState(ConnectionState.S_CLOSED);
@@ -170,8 +170,8 @@ public class TCP {
 	            //try to send it
 	            if (sendAndWaitAck(syn_ack, false)){
 	            	tcb.setState(ConnectionState.S_ESTABLISHED);
-	            	new ReceiverThread().run();
-	            	new SenderThread().run();
+	            	new Thread(new ReceiverThread()).start();
+	            	new Thread(new SenderThread()).start();
 	            	return;
 	            }
 	            
