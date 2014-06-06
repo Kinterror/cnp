@@ -41,7 +41,6 @@ public class BoundedByteBuffer {
 	 * @param offset the offset on which to start writing to the array
 	 * @param nBytes
 	 * @return the number of bytes read from the buffer
-	 * @throws EmptyCollectionException 
 	 */
 	public synchronized int deBuffer(byte[] array, int offset, int nBytes) {
 		int i = offset, nread = 0;
