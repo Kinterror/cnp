@@ -8,16 +8,12 @@ import nl.vu.cs.cn.IP.IpAddress;
 class TCPControlBlock{
 	
 	//maximum value of uint32 for sequence numbers
-	private static final long UINT_32_MAX = (2 * (long) Integer.MAX_VALUE + 1);
+	private static final long UINT_32_MAX = (2 * ((long) Integer.MAX_VALUE) + 1);
 	
 	//random number generator for sequence numbers
 	private Random rand;
 	
-	//size of the data buffer
-	//TODO set to right value
-	//private static final int TCB_BUF_SIZE = 0;
-	
-	public enum ConnectionState
+	enum ConnectionState
 	{
 		S_CLOSED, S_LISTEN, S_SYN_SENT, S_SYN_RCVD, S_ESTABLISHED,
 		S_FIN_WAIT_1, S_FIN_WAIT_2, S_CLOSE_WAIT, S_LAST_ACK, S_TIME_WAIT

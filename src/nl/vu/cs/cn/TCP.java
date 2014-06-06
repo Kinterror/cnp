@@ -17,24 +17,13 @@ public class TCP {
 	 * only one port is needed for this. */
 	public static final int DEFAULT_CLIENT_PORT = 12345;
 	
-	/** The underlying IP stack for this TCP stack. */
-	private IP ip;
-
-	/**packet ID which is initially zero and is incremented each time a packet is sent through the IP layer*/
-	int ip_packet_id;
-	
-	/**the timeout for receiving packets*/
-	public int timeout;
-	
-	/**the default for receiving packets*/
-	public static final int DEFAULT_TIMEOUT = 1;
-	
-	/**MSL time (seconds) used in the connection termination timer*/
+	/**MSL (maximum segment lifetime) (seconds) used in the connection termination timer*/
 	public static final int MSL = 10;
 	
 	/**maximum number of tries waiting for an ack*/
 	public static final int MAX_TRIES = 10;
 	
+	/**the length of TCP headers used by our implementation. Options are not supported.*/
 	public static final int IP_HEADER_LENGTH = 20;
 	
 	/**the maximum size (bytes) of any packet sent through the ip layer*/
@@ -43,17 +32,28 @@ public class TCP {
 	/** Size of the send and receive buffer */
 	public static final int BUFFER_SIZE = 1048576; // 1MB
 	
+	/**the default for receiving packets*/
+	public static final int DEFAULT_TIMEOUT = 1;
 	
+	/**the timeout in seconds for receiving packets. Initially set to DEFAULT_TIMEOUT. */
+	public int timeout;
+	
+	/** The underlying IP stack for this TCP stack. */
+	private IP ip;
+
+	/**packet ID which is initially zero and is incremented each time a packet is sent through the IP layer*/
+	private int ip_packet_id;
 	
     /**
      * This class represents a TCP socket.
-     *
      */
     public class Socket {
 
-    	/* Hint: You probably need some socket specific data. */
     	private boolean isClientSocket;
     	
+    	/**
+    	 * transmission control block, shared between the sender and receiver threads
+    	 */
 		private volatile TCPControlBlock tcb;
 		private volatile BoundedByteBuffer recv_buf;
 		private volatile BoundedByteBuffer send_buf;
@@ -61,9 +61,7 @@ public class TCP {
 		private volatile boolean isWaitingForAck;
 		private Object waitingForAckMonitor;
 		
-    	/**
-    	 * Construct a client socket.
-    	 */
+    	/** Construct a client socket. */
     	private Socket() {
     		this(DEFAULT_CLIENT_PORT);
     		isClientSocket = true;
@@ -456,7 +454,7 @@ public class TCP {
         			}
         			try {
 						send_buf.buffer(data);
-						send_buf.notify();
+						synchronized(send_buf) {send_buf.notify(); }
 					} catch (FullCollectionException e) {
 						//no more bytes are written
 						break;
