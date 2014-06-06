@@ -52,11 +52,11 @@ public class TCP {
     public class Socket {
 
     	/* Hint: You probably need some socket specific data. */
-    	boolean isClientSocket;
+    	private boolean isClientSocket;
     	
-		TCPControlBlock tcb;
-		private BoundedByteBuffer recv_buf;
-		private BoundedByteBuffer send_buf;
+		private volatile TCPControlBlock tcb;
+		private volatile BoundedByteBuffer recv_buf;
+		private volatile BoundedByteBuffer send_buf;
 		
 		private volatile boolean isWaitingForAck;
 		private Object waitingForAckMonitor;
@@ -263,7 +263,7 @@ public class TCP {
 		        		break;
 		        	}
 	        	} catch (InvalidPacketException e) {
-	        		//discard it?
+	        		//discard it
 	        	}
         	}
         	return pck;
@@ -516,10 +516,9 @@ public class TCP {
 						TCPSegment seg = new TCPSegment(TCPSegmentType.DATA, data);
 						
 						int ntries = 0;
-						
+						isWaitingForAck = true;
 						do {
 							sockSend(seg);
-							isWaitingForAck = true;
 							/*there's an innocent race condition here that makes us lose one second
 							 * if this thread gets preempted here and the receive thread receives the
 							 * packet and calls notify before this thread has entered wait state.
@@ -535,6 +534,7 @@ public class TCP {
 						//check if ack was received or timeout
 						if (isWaitingForAck) {
 							Log.e("Connection broken", "number of retries expired for ack");
+							tcb.setState(ConnectionState.S_CLOSED);
 							System.exit(-1);
 						}
 					} else {
