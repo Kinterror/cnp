@@ -149,7 +149,11 @@ public class TCP {
 	        	
 	            while (tcb.getState() == ConnectionState.S_LISTEN){
 	            	//receive a packet from the network
-					syn_pck = sockRecv();
+					try {
+						syn_pck = recv_tcp_segment(0);
+					} catch (Exception e){
+						continue;
+					}
 					if(syn_pck.getSegmentType() == TCPSegmentType.SYN)
 					{
 						//initialize the connection state to S_SYN_RCVD
@@ -641,6 +645,10 @@ public class TCP {
     			bytes, bytes.length);
     	ip_packet.source = source;
     	ip_packet_id++;
+    	
+    	//log for debugging details
+    	Log.d("send_tcp_segment()","Packet to be sent: " + p.toString());
+    	Log.d("send_tcp_segment()","to IP : " + destination.toString() + " at port : " + p.dest_port);
     	
     	//send packet
     	ip.ip_send(ip_packet);
