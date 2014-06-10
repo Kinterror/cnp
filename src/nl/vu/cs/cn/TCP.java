@@ -99,10 +99,13 @@ public class TCP {
             // Implement the connection side of the three-way handshake here.
         	tcb.setRemoteSocketAddress(new SocketAddress(dst, port));
         	
+        	//generate sequence number
+        	tcb.generate_seqnr();
+        	
         	//construct a syn packet
         	TCPSegment syn_pck = new TCPSegment(
         			tcb.getLocalSocketAddress().getPort(),
-        			port, tcb.generate_seqnr(), 
+        			port, tcb.increment_seqnr(0), 
         			0,
         			TCPSegmentType.SYN, new byte[0]
         	);
@@ -115,6 +118,7 @@ public class TCP {
         		sockSend(ack);
         		
         		tcb.setState(ConnectionState.S_ESTABLISHED);
+        		//start sender and receiver threads
         		new Thread(new ReceiverThread()).start();
             	new Thread(new SenderThread()).start();
         		return true;
@@ -260,9 +264,42 @@ public class TCP {
         	while(true){
 	        	try{
 	        		pck = recv_tcp_segment(timeout);
-		        	if(tcb.isValidSegment(pck)){
-		        		//TODO tcb.getAndIncrement_acknr(pck.getDataLength());
+		        	if(tcb.hasValidAddress(pck) && tcb.isInOrderPacket(pck)){
+		        		
+		        		//increment acknr if received non-ack packet
+		        		switch(pck.getSegmentType()){
+		        		case ACK:
+		        			break;
+		        		default:
+			        		tcb.increment_acknr(pck.data.length);
+		        		}
+		        			
 		        		break;
+		        	} else if (tcb.hasValidAddress(pck) && pck.seq_nr == tcb.get_previous_acknr()){
+		        		switch(pck.getSegmentType()){
+		        		case SYNACK:
+		        		case DATA:
+		        		case FIN:
+		        			//resend ack
+		        			TCPSegment ack = new TCPSegment(TCPSegmentType.ACK);
+		        			
+		        			//set address/port fields right
+		        			SocketAddress remoteAddr = tcb.getRemoteSocketAddress();
+		        			ack.setDestPort(remoteAddr.getPort());
+		        			ack.setSrcPort(tcb.getLocalSocketAddress().getPort());
+		                	
+		        			//set sequence numbers right
+		        			ack.setSeqNr(tcb.get_previous_seqnr());
+		        			ack.setAckNr(tcb.get_acknr());
+		        			
+		                	try{
+		                		send_tcp_segment(remoteAddr.getIp(), ack);
+		                	} catch (IOException e) {
+		                		//do nothing
+		                	}
+		        		default:
+		        			//do nothing
+		        		}
 		        	}
 	        	} catch (InvalidPacketException e) {
 	        		//discard it
@@ -288,7 +325,7 @@ public class TCP {
         private synchronized boolean sockSend(TCPSegment pck) {
         	SocketAddress remoteAddr = tcb.getRemoteSocketAddress();
         	
-        	pck.setSeqNr(tcb.getAndIncrement_seqnr(pck.getDataLength()));
+        	pck.setSeqNr(tcb.get_seqnr());
         	pck.setAckNr(tcb.get_acknr());
         	pck.setDestPort(remoteAddr.getPort());
         	pck.setSrcPort(tcb.getLocalSocketAddress().getPort());
@@ -299,7 +336,6 @@ public class TCP {
         		e.printStackTrace();
         		return false;
         	}
-        	//TODO increment sequence number
         	return true;
         }
         
@@ -309,7 +345,7 @@ public class TCP {
          */
         private boolean sendAndWaitAck(TCPSegment pck, boolean doWaitForSynAck) {
         	int ntried = 0;
-
+        	
         	while (true){
         		//try to send packet with right port and sequence numbers.
         		if (!sockSend(pck))
@@ -352,8 +388,6 @@ public class TCP {
 						break;
 					case FIN:
 						handleIncomingFin();
-					case SYNACK:
-						//TODO what if ack of 3wh was lost? Compare current expected sequence number to the initial.
 					default:
 						//continue
 					}
@@ -369,13 +403,17 @@ public class TCP {
         private boolean waitForSynAck(){
         	while(true){
         		try {
-					TCPSegment seg = sockRecv(timeout);
-					if ( seg.getSegmentType() == TCPSegmentType.SYNACK){
+					TCPSegment seg = recv_tcp_segment(timeout);
+					if (seg.getSegmentType() == TCPSegmentType.SYNACK &&
+							tcb.hasValidAddress(seg) &&
+							tcb.get_acknr() == seg.seq_nr){
 						tcb.initClient(seg);
 						return true;
 					}
         		} catch (InterruptedException e) {
         			return false;
+        		} catch (InvalidPacketException e) {
+        			//do nothing
         		}
         	}
         }
@@ -517,6 +555,9 @@ public class TCP {
 						send_buf.deBuffer(data, 0, MAX_TCPIP_SEGMENT_SIZE);
 						TCPSegment seg = new TCPSegment(TCPSegmentType.DATA, data);
 						
+						//increment the sequence number before sending
+						seg.setSeqNr(tcb.increment_seqnr(data.length));
+						
 						int ntries = 0;
 						isWaitingForAck = true;
 						do {
@@ -570,8 +611,6 @@ public class TCP {
 					case FIN:
 						handleIncomingFin();
 						break;
-					case SYNACK:
-						//TODO handle synack-ack loss
 					default:
 						//do nothing
 					}

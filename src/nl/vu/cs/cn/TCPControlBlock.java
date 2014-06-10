@@ -25,11 +25,13 @@ class TCPControlBlock{
 	private int local_port;
 	private int remote_port;
 	private long our_sequence_num;
-	private long our_expected_ack;
+	private long previous_seqnr;
+	private long our_ack_nr;
+	private long previous_acknr;
 
 	TCPControlBlock(){
 		state = ConnectionState.S_CLOSED;
-		our_sequence_num = our_expected_ack = 0;
+		our_sequence_num = our_ack_nr = previous_seqnr = previous_acknr = 0;
 		local_port = 0;
 		remote_port = 0;
 
@@ -41,12 +43,12 @@ class TCPControlBlock{
 		setRemoteSocketAddress(s.getSrcSocketAddress());
 		//generate sequence number and update state and acknowledgment number.
 		generate_seqnr();
-		set_acknr(s.seq_nr);
+		set_acknr(s.seq_nr + 1);
 		setState(ConnectionState.S_SYN_RCVD);
 	}
 	
 	void initClient(TCPSegment s){
-		set_acknr(s.seq_nr);
+		set_acknr(s.seq_nr + 1);
 	}
 		
 	void setState(ConnectionState s){
@@ -88,31 +90,48 @@ class TCPControlBlock{
 	 * @param size
 	 * @return the old sequence number
 	 */
-	long getAndIncrement_seqnr(long size){
-		long tmp = our_sequence_num;
+	long increment_seqnr(long size){
+		previous_seqnr = our_sequence_num;
 		//this sequence number never becomes negative
-		our_sequence_num = (our_sequence_num + size) % UINT_32_MAX;
-		return tmp;
+		our_sequence_num = (our_sequence_num + (size > 0 ? size : 1)) % UINT_32_MAX;
+		return previous_seqnr;
 	}
 	
 	void set_acknr(long acknr){
-		our_expected_ack = acknr;
+		our_ack_nr = acknr;
 	}
 	
-	long getAndIncrement_acknr(long size){
-		long tmp = our_expected_ack;
-		our_expected_ack = (our_expected_ack + size) % UINT_32_MAX;
-		return tmp;
+	long increment_acknr(long size){
+		previous_acknr = our_ack_nr;
+		our_ack_nr = (our_ack_nr + (size > 0 ? size : 1)) % UINT_32_MAX;
+		return previous_acknr;
 	}
 
 	long get_acknr(){
-		return our_expected_ack;
+		return our_ack_nr;
 	}
 	
-	boolean isValidSegment(TCPSegment pck) {
-		//TODO check sequence number
+	long get_seqnr(){
+		return our_sequence_num;
+	}
+
+	long get_previous_seqnr(){
+		return previous_seqnr;
+	}
+	
+	long get_previous_acknr(){
+		return previous_acknr;
+	}
+	
+	boolean hasValidAddress(TCPSegment pck) {
 		return 	pck.hasDestPort(local_port) &&
 				pck.hasSrcIp(remote_ip_addr) &&
 				pck.hasSrcPort(remote_port);
+	}
+	
+	boolean isInOrderPacket(TCPSegment pck) {
+		//TODO fix this!
+		return pck.seq_nr == our_ack_nr &&
+				pck.ack_nr == our_sequence_num;
 	}
 }
