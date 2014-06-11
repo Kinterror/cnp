@@ -123,6 +123,7 @@ public class TCP {
             	new Thread(new SenderThread()).start();
         		return true;
         	} else {
+        		Log.e("accept()", "failed to receive a SYN_ACK message from server");
         		tcb.setState(ConnectionState.S_CLOSED);
         		return false;
         	}
@@ -361,12 +362,12 @@ public class TCP {
 	        	}
         		if (!hasReceived){
         			ntried++;
-					if (ntried >= MAX_TRIES)
+					if (ntried >= MAX_TRIES){
 						return false;
+					}
         		} else {
         			return true;
         		}
-        		//wait for synack
         	}
         }
         
