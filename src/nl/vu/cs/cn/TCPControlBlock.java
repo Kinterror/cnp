@@ -24,14 +24,14 @@ class TCPControlBlock{
 	private IpAddress remote_ip_addr;
 	private int local_port;
 	private int remote_port;
-	private long our_sequence_num;
-	private long previous_seqnr;
+	private long current_seqnr;
+	private long next_seqnr;
 	private long our_ack_nr;
 	private long previous_acknr;
 
 	TCPControlBlock(){
 		state = ConnectionState.S_CLOSED;
-		our_sequence_num = our_ack_nr = previous_seqnr = previous_acknr = 0;
+		current_seqnr = our_ack_nr = previous_acknr = 0;
 		local_port = 0;
 		remote_port = 0;
 
@@ -82,7 +82,9 @@ class TCPControlBlock{
 	 * @return the sequence number
 	 */
 	long generateSeqnr(){
-		return our_sequence_num = Math.abs(rand.nextLong() % UINT_32_MAX);
+		current_seqnr = Math.abs(rand.nextLong() % UINT_32_MAX);
+		next_seqnr = current_seqnr + 1;
+		return current_seqnr;
 	}
 	
 	/**
@@ -90,11 +92,20 @@ class TCPControlBlock{
 	 * @param size
 	 * @return the old sequence number
 	 */
-	long getAndIncrementSeqnr(long size){
-		previous_seqnr = our_sequence_num;
+	long getAndIncrementSeqnr(){
+		long previous_seqnr = current_seqnr;
+		current_seqnr = next_seqnr;
 		//this sequence number never becomes negative
-		our_sequence_num = (our_sequence_num + (size > 0 ? size : 1)) % UINT_32_MAX;
+		
 		return previous_seqnr;
+	}
+	
+	long getNextSeqnr(){
+		return next_seqnr;
+	}
+	
+	void increaseNextSeqnr(long size){
+		next_seqnr += (size > 0 ? size : 1) % UINT_32_MAX;
 	}
 	
 	void setAcknr(long acknr){
@@ -107,19 +118,15 @@ class TCPControlBlock{
 		return previous_acknr;
 	}
 
-	long getAcknr(){
+	long getExpectedSeqnr(){
 		return our_ack_nr;
 	}
 	
 	long getSeqnr(){
-		return our_sequence_num;
+		return current_seqnr;
 	}
 
-	long getPreviousSeqnr(){
-		return previous_seqnr;
-	}
-	
-	long getPreviousAcknr(){
+	long getPreviousExpectedSeqnr(){
 		return previous_acknr;
 	}
 	
@@ -130,8 +137,7 @@ class TCPControlBlock{
 	}
 	
 	boolean isInOrderPacket(TCPSegment pck) {
-		//TODO fix this!
 		return pck.seq_nr == our_ack_nr &&
-				pck.ack_nr == our_sequence_num;
+				pck.ack_nr == next_seqnr;
 	}
 }
