@@ -42,13 +42,13 @@ class TCPControlBlock{
 		//update connection source
 		setRemoteSocketAddress(s.getSrcSocketAddress());
 		//generate sequence number and update state and acknowledgment number.
-		generate_seqnr();
-		set_acknr(s.seq_nr + 1);
+		generateSeqnr();
+		setAcknr(s.seq_nr + 1);
 		setState(ConnectionState.S_SYN_RCVD);
 	}
 	
 	void initClient(TCPSegment s){
-		set_acknr(s.seq_nr + 1);
+		setAcknr(s.seq_nr + 1);
 	}
 		
 	void setState(ConnectionState s){
@@ -81,7 +81,7 @@ class TCPControlBlock{
 	 * generates a new sequence number for this tcb  and updates it in the TCB
 	 * @return the sequence number
 	 */
-	long generate_seqnr(){
+	long generateSeqnr(){
 		return our_sequence_num = Math.abs(rand.nextLong() % UINT_32_MAX);
 	}
 	
@@ -90,36 +90,36 @@ class TCPControlBlock{
 	 * @param size
 	 * @return the old sequence number
 	 */
-	long increment_seqnr(long size){
+	long getAndIncrementSeqnr(long size){
 		previous_seqnr = our_sequence_num;
 		//this sequence number never becomes negative
 		our_sequence_num = (our_sequence_num + (size > 0 ? size : 1)) % UINT_32_MAX;
 		return previous_seqnr;
 	}
 	
-	void set_acknr(long acknr){
+	void setAcknr(long acknr){
 		our_ack_nr = acknr;
 	}
 	
-	long increment_acknr(long size){
+	long getAndIncrementAcknr(long size){
 		previous_acknr = our_ack_nr;
 		our_ack_nr = (our_ack_nr + (size > 0 ? size : 1)) % UINT_32_MAX;
 		return previous_acknr;
 	}
 
-	long get_acknr(){
+	long getAcknr(){
 		return our_ack_nr;
 	}
 	
-	long get_seqnr(){
+	long getSeqnr(){
 		return our_sequence_num;
 	}
 
-	long get_previous_seqnr(){
+	long getPreviousSeqnr(){
 		return previous_seqnr;
 	}
 	
-	long get_previous_acknr(){
+	long getPreviousAcknr(){
 		return previous_acknr;
 	}
 	
