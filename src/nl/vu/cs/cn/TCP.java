@@ -105,7 +105,7 @@ public class TCP {
         	//construct a syn packet
         	TCPSegment syn_pck = new TCPSegment(
         			tcb.getLocalSocketAddress().getPort(),
-        			port, tcb.getAndIncrementSeqnr(1), 
+        			port, tcb.getSeqnr(), 
         			0,
         			TCPSegmentType.SYN, new byte[0]
         	);
@@ -113,6 +113,8 @@ public class TCP {
         	//send it and wait for a synack
         	tcb.setState(ConnectionState.S_SYN_SENT);
         	if (sendAndWaitAck(syn_pck, true)){
+        		tcb.getAndIncrementSeqnr(syn_pck.data.length);
+        		
         		//send ack
         		TCPSegment ack = new TCPSegment(TCPSegmentType.ACK);
         		sockSend(ack);
