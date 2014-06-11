@@ -298,9 +298,14 @@ public class TCP {
 		                	} catch (IOException e) {
 		                		//do nothing
 		                	}
+		                	break;
+		        		case SYN:
+		        			//now the SYNACK was lost. 
+		        			break;
 		        		default:
-		        			//do nothing
+		        			continue;
 		        		}
+		        		break;
 		        	}
 	        	} catch (InvalidPacketException e) {
 	        		//discard it
@@ -389,6 +394,9 @@ public class TCP {
 						break;
 					case FIN:
 						handleIncomingFin();
+						break;
+					case SYN:
+						return false;
 					default:
 						//continue
 					}
@@ -412,6 +420,8 @@ public class TCP {
 						//initialize acknr of client
 						tcb.initClient(seg);
 						return true;
+					} else if (seg.ack_nr != tcb.get_seqnr()){
+						Log.e("waitForSynAck()", "received acknr " + seg.ack_nr + ". Expected: " + tcb.get_seqnr());
 					}
         		} catch (InterruptedException e) {
         			return false;
@@ -717,6 +727,7 @@ public class TCP {
 			e.printStackTrace();
 			return null;
 		}
+    	
     	if(ip_packet.protocol != IP.TCP_PROTOCOL){
 			//not for me
 			return null;
@@ -732,6 +743,8 @@ public class TCP {
 		
 		//get source IP address which is used by the higher layers
 		tcp_packet.source_ip = IpAddress.getAddress(ip_packet.source);
+		
+		Log.d("recv_tcp_segment()", "received packet: " + tcp_packet.toString());
 		
 		//validate checksum
 		if (!tcp_packet.validateChecksum(ip_packet.source, ip_packet.destination)){
