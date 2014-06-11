@@ -405,8 +405,10 @@ public class TCP {
         	while(true){
         		try {
 					TCPSegment seg = recv_tcp_segment(timeout);
+					//check if it has the right socket address, acknr, and the right type
 					if (seg.getSegmentType() == TCPSegmentType.SYNACK &&
-							tcb.checkValidAddress(seg)){
+							tcb.checkValidAddress(seg) &&
+							seg.ack_nr == tcb.get_seqnr()){
 						//initialize acknr of client
 						tcb.initClient(seg);
 						return true;
