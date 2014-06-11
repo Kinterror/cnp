@@ -123,7 +123,7 @@ class TCPControlBlock{
 		return previous_acknr;
 	}
 	
-	boolean hasValidAddress(TCPSegment pck) {
+	boolean checkValidAddress(TCPSegment pck) {
 		return 	pck.hasDestPort(local_port) &&
 				pck.hasSrcIp(remote_ip_addr) &&
 				pck.hasSrcPort(remote_port);

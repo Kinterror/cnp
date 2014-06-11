@@ -265,7 +265,7 @@ public class TCP {
         	while(true){
 	        	try{
 	        		pck = recv_tcp_segment(timeout);
-		        	if(tcb.hasValidAddress(pck) && tcb.isInOrderPacket(pck)){
+		        	if(tcb.checkValidAddress(pck) && tcb.isInOrderPacket(pck)){
 		        		
 		        		//increment acknr if received non-ack packet
 		        		switch(pck.getSegmentType()){
@@ -276,7 +276,7 @@ public class TCP {
 		        		}
 		        			
 		        		break;
-		        	} else if (tcb.hasValidAddress(pck) && pck.seq_nr == tcb.get_previous_acknr()){
+		        	} else if (tcb.checkValidAddress(pck) && pck.seq_nr == tcb.get_previous_acknr()){
 		        		switch(pck.getSegmentType()){
 		        		case SYNACK:
 		        		case DATA:
@@ -406,8 +406,8 @@ public class TCP {
         		try {
 					TCPSegment seg = recv_tcp_segment(timeout);
 					if (seg.getSegmentType() == TCPSegmentType.SYNACK &&
-							tcb.hasValidAddress(seg) &&
-							tcb.get_acknr() == seg.seq_nr){
+							tcb.checkValidAddress(seg)){
+						//initialize acknr of client
 						tcb.initClient(seg);
 						return true;
 					}
