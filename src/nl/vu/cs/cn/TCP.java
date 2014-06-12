@@ -301,9 +301,8 @@ public class TCP {
 		                	try{
 		                		send_tcp_segment(remoteAddr.getIp(), ack);
 		                	} catch (IOException e) {
-		                		//do nothing
+		                		continue;
 		                	}
-		                	break;
 		        		case SYN:
 		        			//now the SYNACK was lost. 
 		        			break;

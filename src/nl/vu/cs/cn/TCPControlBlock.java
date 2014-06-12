@@ -26,12 +26,12 @@ class TCPControlBlock{
 	private int remote_port;
 	private long current_seqnr;
 	private long next_seqnr;
-	private long our_ack_nr;
+	private long current_acknr;
 	private long previous_acknr;
 
 	TCPControlBlock(){
 		state = ConnectionState.S_CLOSED;
-		current_seqnr = our_ack_nr = previous_acknr = 0;
+		current_seqnr = current_acknr = previous_acknr = 0;
 		local_port = 0;
 		remote_port = 0;
 
@@ -43,13 +43,14 @@ class TCPControlBlock{
 		setRemoteSocketAddress(s.getSrcSocketAddress());
 		//generate sequence number and update state and acknowledgment number.
 		generateSeqnr();
-		setAcknr(s.seq_nr + 1);
+		previous_acknr = s.seq_nr;
+		current_acknr = s.seq_nr + 1;
 		setState(ConnectionState.S_SYN_RCVD);
 	}
 	
 	void initClient(TCPSegment s){
 		previous_acknr = s.seq_nr;
-		our_ack_nr = previous_acknr + 1;
+		current_acknr = s.seq_nr + 1;
 	}
 		
 	void setState(ConnectionState s){
@@ -110,17 +111,17 @@ class TCPControlBlock{
 	}
 	
 	void setAcknr(long acknr){
-		our_ack_nr = acknr;
+		current_acknr = acknr;
 	}
 	
 	long getAndIncrementAcknr(long size){
-		previous_acknr = our_ack_nr;
-		our_ack_nr = (our_ack_nr + (size > 0 ? size : 1)) % UINT_32_MAX;
+		previous_acknr = current_acknr;
+		current_acknr = (current_acknr + (size > 0 ? size : 1)) % UINT_32_MAX;
 		return previous_acknr;
 	}
 
 	long getExpectedSeqnr(){
-		return our_ack_nr;
+		return current_acknr;
 	}
 	
 	long getSeqnr(){
@@ -138,7 +139,7 @@ class TCPControlBlock{
 	}
 	
 	boolean isInOrderPacket(TCPSegment pck) {
-		return pck.seq_nr == our_ack_nr &&
+		return pck.seq_nr == current_acknr &&
 				pck.ack_nr == next_seqnr;
 	}
 }
