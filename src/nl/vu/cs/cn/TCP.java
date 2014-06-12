@@ -361,9 +361,7 @@ public class TCP {
          * wrapper for sockSend. try to send a packet and wait for the acknowledgment.
          */
         private boolean sendAndWaitAck(TCPSegment pck, boolean doWaitForSynAck) {
-        	int ntried = 0;
-        	
-        	while (true){
+        	for (int ntried = 0; ntried < MAX_TRIES; ntried++) {
         		//try to send packet with right port and sequence numbers.
         		if (!sockSend(pck))
         			return false;
@@ -376,15 +374,11 @@ public class TCP {
 	        	} else {
 	        		hasReceived = waitForSynAck();
 	        	}
-        		if (!hasReceived){
-        			ntried++;
-					if (ntried >= MAX_TRIES){
-						return false;
-					}
-        		} else {
+        		if (hasReceived){
         			return true;
         		}
         	}
+        	return false;
         }
         
         /**
