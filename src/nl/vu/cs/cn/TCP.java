@@ -587,7 +587,9 @@ public class TCP {
 							 */
 							try {
 								//wait until the receiver thread receives an ack
-								waitingForAckMonitor.wait(1000);
+								synchronized(waitingForAckMonitor){
+									waitingForAckMonitor.wait(1000);
+								}
 							} catch (InterruptedException e) { e.printStackTrace(); }
 							ntries++;
 						} 
@@ -604,7 +606,9 @@ public class TCP {
 						}
 					} else {
 						try {
-							send_buf.wait(1000);
+							synchronized (send_buf) {
+								send_buf.wait(1000);
+							}
 						} catch (InterruptedException e) { e.printStackTrace(); }
 					}
 				}
