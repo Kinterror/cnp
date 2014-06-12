@@ -48,7 +48,8 @@ class TCPControlBlock{
 	}
 	
 	void initClient(TCPSegment s){
-		setAcknr(s.seq_nr + 1);
+		previous_acknr = s.seq_nr;
+		our_ack_nr = previous_acknr + 1;
 	}
 		
 	void setState(ConnectionState s){
