@@ -312,9 +312,11 @@ public class TCP {
 		        		}
 		        		break;
 		        	} else if (tcb.checkValidAddress(pck)){
-		        		Log.e("sockRecv", "received incorrect (out of order) packet with sequence number " + pck.seq_nr + 
+		        		Log.d("sockRecv", "received incorrect (out of order) packet with sequence number " + pck.seq_nr + 
 		        				" and acknowledgement number " + pck.ack_nr + ". Expected: "+ tcb.getExpectedSeqnr() +
 		        				", " + tcb.getNextSeqnr());
+		        	} else {
+		        		Log.d("sockRecv", "received packet with invalid address or port");
 		        	}
 	        	} catch (InvalidPacketException e) {
 	        		//discard it
