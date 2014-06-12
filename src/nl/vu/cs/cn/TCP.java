@@ -311,6 +311,10 @@ public class TCP {
 		        			continue;
 		        		}
 		        		break;
+		        	} else if (tcb.checkValidAddress(pck)){
+		        		Log.e("sockRecv", "received incorrect (out of order) packet with sequence number " + pck.seq_nr + 
+		        				" and acknowledgement number " + pck.ack_nr + ". Expected: "+ tcb.getExpectedSeqnr() +
+		        				", " + tcb.getNextSeqnr());
 		        	}
 	        	} catch (InvalidPacketException e) {
 	        		//discard it
