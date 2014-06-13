@@ -33,16 +33,6 @@ class TCPSegment{
 	static final int HEADER_LENGTH = 20;
 	IpAddress source_ip;
 	
-	/**constructor for a control segment with no data or otherwise specified fields*/
-	TCPSegment(TCPSegmentType st){
-		this(st, new byte[0]);
-	}
-	
-	/**constructor for a segment without specified ports, checksum and seqnrs*/
-	TCPSegment(TCPSegmentType st, byte[] data){
-		this(0, 0, 0, 0, st, data);
-	}
-	
 	/**constructor without checksum*/
 	TCPSegment(int src_port, int dest_port, long seq_nr, long ack_nr,
 			TCPSegmentType st, byte[] data){

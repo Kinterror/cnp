@@ -3,6 +3,7 @@ package nl.vu.cs.cn;
 import java.util.Random;
 
 import nl.vu.cs.cn.IP.IpAddress;
+import nl.vu.cs.cn.TCPSegment.TCPSegmentType;
 
 /**definition of the Connection states*/
 class TCPControlBlock{
@@ -25,13 +26,13 @@ class TCPControlBlock{
 	private int local_port;
 	private int remote_port;
 	private long current_seqnr;
-	private long next_seqnr;
+	private long previous_seqnr;
 	private long current_acknr;
 	private long previous_acknr;
 
 	TCPControlBlock(){
 		state = ConnectionState.S_CLOSED;
-		current_seqnr = current_acknr = previous_acknr = 0;
+		current_seqnr = current_acknr = previous_acknr = previous_seqnr = 0;
 		local_port = 0;
 		remote_port = 0;
 
@@ -85,7 +86,7 @@ class TCPControlBlock{
 	 */
 	long generateSeqnr(){
 		current_seqnr = Math.abs(rand.nextLong() % UINT_32_MAX);
-		next_seqnr = current_seqnr + 1;
+		previous_seqnr = 0;
 		return current_seqnr;
 	}
 	
@@ -94,26 +95,23 @@ class TCPControlBlock{
 	 * @param size
 	 * @return the old sequence number
 	 */
-	long getAndIncrementSeqnr(){
-		long previous_seqnr = current_seqnr;
-		current_seqnr = next_seqnr;
+	long getAndIncrementSeqnr(long size){
+		previous_seqnr = current_seqnr;
+		current_seqnr  += (size > 0 ? size : 1) % UINT_32_MAX;
 		//this sequence number never becomes negative
 		
 		return previous_seqnr;
-	}
-	
-	long getNextSeqnr(){
-		return next_seqnr;
-	}
-	
-	void increaseNextSeqnr(long size){
-		next_seqnr += (size > 0 ? size : 1) % UINT_32_MAX;
 	}
 	
 	void setAcknr(long acknr){
 		current_acknr = acknr;
 	}
 	
+	/**
+	 * increments the ack number by size, and do it modulo the maximum ack number. Then update the value
+	 * @param size
+	 * @return the old ack number
+	 */
 	long getAndIncrementAcknr(long size){
 		previous_acknr = current_acknr;
 		current_acknr = (current_acknr + (size > 0 ? size : 1)) % UINT_32_MAX;
@@ -128,6 +126,10 @@ class TCPControlBlock{
 		return current_seqnr;
 	}
 
+	long getPreviousSeqnr(){
+		return previous_seqnr;
+	}
+	
 	long getPreviousExpectedSeqnr(){
 		return previous_acknr;
 	}
@@ -140,6 +142,20 @@ class TCPControlBlock{
 	
 	boolean isInOrderPacket(TCPSegment pck) {
 		return pck.seq_nr == current_acknr &&
-				pck.ack_nr == next_seqnr;
+				pck.ack_nr == current_seqnr;
+	}
+	
+	TCPSegment createControlSegment(TCPSegmentType st){
+		return new TCPSegment(local_port, remote_port, getAndIncrementSeqnr(0), current_acknr,
+				st, new byte[0]);
+	}
+	
+	TCPSegment createDataSegment(byte[] data){
+		return new TCPSegment(local_port, remote_port, getAndIncrementSeqnr(data.length), current_acknr,
+				TCPSegmentType.DATA, data);
+	}
+	
+	TCPSegment generatePreviousAck(){
+		return new TCPSegment(local_port, remote_port, previous_seqnr, current_acknr, TCPSegmentType.ACK, new byte[0]);
 	}
 }
