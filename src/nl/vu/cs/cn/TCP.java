@@ -307,6 +307,7 @@ public class TCP {
 		        			//now the SYNACK was lost. 
 		        			break;
 		        		default:
+		        			//discard duplicate ACK or invalid old packet
 		        			continue;
 		        		}
 		        		break;
