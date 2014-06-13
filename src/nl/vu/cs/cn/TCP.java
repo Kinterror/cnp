@@ -120,6 +120,7 @@ public class TCP {
         		sockSend(ack);
         		
         		tcb.setState(ConnectionState.S_ESTABLISHED);
+        		Log.d("connect()", "Client: connection established");
         		//start sender and receiver threads
         		new Thread(new ReceiverThread()).start();
             	new Thread(new SenderThread()).start();
@@ -175,6 +176,7 @@ public class TCP {
 	            //try to send it
 	            if (sendAndWaitAck(syn_ack, false)){
 	            	tcb.setState(ConnectionState.S_ESTABLISHED);
+	            	Log.d("accept()", "Server: Connection established.");
 	            	new Thread(new ReceiverThread()).start();
 	            	new Thread(new SenderThread()).start();
 	            	return;
