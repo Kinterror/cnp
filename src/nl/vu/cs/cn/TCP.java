@@ -631,17 +631,25 @@ public class TCP {
 					TCPSegment seg = sockRecv();
 					switch(seg.getSegmentType()){
 					case DATA:
+						//put the data in the buffer and send an ack
 						handleData(seg);
-						recv_buf.notifyAll();
+						
+						//notify the sender thread of having received data
+						synchronized (recv_buf) {
+							recv_buf.notifyAll();
+						}
 						break;
 					case ACK:
 						//notify the sender thread waiting for an ACK
 						if (isWaitingForAck){
 							isWaitingForAck = false;
-							waitingForAckMonitor.notify();
+							synchronized(waitingForAckMonitor){
+								waitingForAckMonitor.notify();
+							}
 						}
 						break;
 					case FIN:
+						//go to close_wait state and ack the fin
 						handleIncomingFin();
 						break;
 					default:
