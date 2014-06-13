@@ -341,7 +341,7 @@ public class TCP {
          * @param pck
          */
         
-        private synchronized boolean sockSend(TCPSegment pck) {
+        private boolean sockSend(TCPSegment pck) {
         	SocketAddress remoteAddr = tcb.getRemoteSocketAddress();
         	
         	pck.setSeqNr(tcb.getSeqnr());
@@ -574,6 +574,11 @@ public class TCP {
 						byte[] temp = new byte[MAX_TCPIP_SEGMENT_SIZE];
 						int size = send_buf.deBuffer(temp, 0, MAX_TCPIP_SEGMENT_SIZE);
 						byte[] data = new byte[size];
+						
+						//copy data into smaller array to be sent
+						for (int i = 0; i < size; i++) {
+							data[i] = temp[i];
+						}			
 						TCPSegment seg = new TCPSegment(TCPSegmentType.DATA, data);
 						
 						//increment the next sequence number before sending
