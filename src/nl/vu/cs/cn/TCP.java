@@ -125,7 +125,7 @@ public class TCP {
             	new Thread(new SenderThread()).start();
         		return true;
         	} else {
-        		Log.e("accept()", "failed to receive a SYN_ACK message from server");
+        		Log.d("connect()", "failed to receive a SYN_ACK message from server");
         		tcb.setState(ConnectionState.S_CLOSED);
         		return false;
         	}
