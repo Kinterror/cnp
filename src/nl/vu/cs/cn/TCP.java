@@ -205,7 +205,6 @@ public class TCP {
 			} catch (FullCollectionException e) {
 				e.printStackTrace();
 			}
-        	
         }
         
         /**here, the process received a fin packet. handle it according to the current state.*/
@@ -585,31 +584,33 @@ public class TCP {
 						tcb.increaseNextSeqnr(size);
 						
 						int ntries = 0;
-						isWaitingForAck = true;
-						do {
-							sockSend(seg);
-							/*there's an innocent race condition here that makes us lose one second
-							 * if this thread gets preempted here and the receive thread receives the
-							 * packet and calls notify before this thread has entered wait state.
-							 */
-							try {
-								//wait until the receiver thread receives an ack
-								synchronized(waitingForAckMonitor){
+						
+						synchronized(waitingForAckMonitor){
+							isWaitingForAck = true;
+							do {
+								sockSend(seg);
+								/*there's an innocent race condition here that makes us lose one second
+								 * if this thread gets preempted here and the receive thread receives the
+								 * packet and calls notify before this thread has entered wait state.
+								 */
+								try {
+									//wait until the receiver thread receives an ack
 									waitingForAckMonitor.wait(1000);
-								}
-							} catch (InterruptedException e) { e.printStackTrace(); }
-							ntries++;
-						} 
-						while (ntries < MAX_TRIES && isWaitingForAck);
-						
-						//increment seqnr
-						tcb.getAndIncrementSeqnr();
-						
-						//check if ack was received or timeout
-						if (isWaitingForAck) {
-							Log.e("Connection broken", "number of retries expired for ack");
-							tcb.setState(ConnectionState.S_CLOSED);
-							System.exit(-1);
+									
+								} catch (InterruptedException e) { e.printStackTrace(); }
+								ntries++;
+							} 
+							while (ntries < MAX_TRIES && isWaitingForAck);
+							
+							//check if ack was received or timeout
+							if (isWaitingForAck) {
+								Log.e("Connection broken", "number of retries expired for ack");
+								tcb.setState(ConnectionState.S_CLOSED);
+								System.exit(-1);
+							}
+							
+							//increment seqnr
+							tcb.getAndIncrementSeqnr();
 						}
 					} else {
 						try {
