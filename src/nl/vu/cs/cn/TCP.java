@@ -816,10 +816,11 @@ public class TCP {
 		Log.d("recv_tcp_segment()", "received packet: " + tcp_packet.toString());
 		
 		//validate checksum
-		if (!tcp_packet.validateChecksum(ip_packet.source, ip_packet.destination) ||
-				tcp_packet.getSegmentType() == TCPSegmentType.INVALID){
+		if (!tcp_packet.validateChecksum(ip_packet.source, ip_packet.destination)){
 			//packet was corrupted because checksum is not correct
 			throw new InvalidPacketException("Invalid checksum");
+		} else if (tcp_packet.getSegmentType() == TCPSegmentType.INVALID){
+			throw new InvalidPacketException("Invalid flags");
 		}
 		
 		return tcp_packet;
