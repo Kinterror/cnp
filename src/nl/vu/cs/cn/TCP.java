@@ -58,8 +58,14 @@ public class TCP {
 		private volatile BoundedByteBuffer recv_buf;
 		private volatile BoundedByteBuffer send_buf;
 		
-		private volatile boolean isWaitingForAck;
-		private volatile boolean closePending;
+		/**
+		 * used to indicate the data arrived has a previous acknowledgement number; thus, both sides of the connection called
+		 * send() at the same time 
+		 */
+		private volatile boolean outOfOrderAcknr = false;
+		
+		private volatile boolean isWaitingForAck = false;
+		private volatile boolean closePending = false;
 		private Object waitingForAckMonitor;
 		private Object waitingForCloseMonitor;
 		
@@ -75,8 +81,6 @@ public class TCP {
     	 */
         private Socket(int port) {
         	isClientSocket = false;
-        	isWaitingForAck = false;
-        	closePending = false;
         	waitingForAckMonitor = new Object();
         	waitingForCloseMonitor = new Object();
         	tcb = new TCPControlBlock();
@@ -274,21 +278,31 @@ public class TCP {
         	while(true){
 	        	try{
 	        		pck = recv_tcp_segment(timeout);
+	        		
 		        	if(tcb.checkValidAddress(pck) && tcb.isInOrderPacket(pck)){
 		        		
 		        		//increment acknr if received non-ack packet
 		        		switch(pck.getSegmentType()){
-		        		case ACK:
-		        			break;
-		        		default:
+		        		case DATA:
 			        		tcb.getAndIncrementAcknr(pck.data.length);
+			        	default:
 		        		}
-		        		
+		        		outOfOrderAcknr = false;
 		        		break;
-		        	/*
-		        	 * case of lost ack: we receive an old non-ack packet with the previous sequence number
-		        	 */
+		        	} else if (tcb.checkValidAddress(pck) && pck.seq_nr == tcb.getSeqnr() &&
+		        			(pck.ack_nr == tcb.getPreviousExpectedSeqnr()) && 
+		        			pck.getSegmentType() == TCPSegmentType.DATA){
+		        		/*received data packet just after having sent a data packet by yourself
+		        		 * therefore, the acknr is one too old
+		        		 */
+		        		tcb.getAndIncrementAcknr(pck.data.length);
+		        		outOfOrderAcknr = true;
+		        		break;
+		        	
 		        	} else if (tcb.checkValidAddress(pck) && pck.seq_nr == tcb.getPreviousExpectedSeqnr()){
+		        		/*
+			        	 * case of lost ack: we receive an old non-ack packet with the previous sequence number
+			        	 */
 		        		switch(pck.getSegmentType()){
 		        		case SYNACK:
 		        		case DATA:
@@ -642,23 +656,25 @@ public class TCP {
 						tcb.getState() == ConnectionState.S_FIN_WAIT_2){ 
 					TCPSegment seg = sockRecv();
 					switch(seg.getSegmentType()){
-					case DATA:
-						//put the data in the buffer and send an ack
-						handleData(seg);
-						
-						//notify the application thread of having received data
-						synchronized (recv_buf) {
-							recv_buf.notifyAll();
-						}
-						/*do not break since data with the right sequence/ack numbers is regarded as an acknowledgement
-						* for the sent data.
-						*/
 					case ACK:
-						//notify the sender thread waiting for an ACK
-						synchronized(waitingForAckMonitor){
-							if (isWaitingForAck){
-								isWaitingForAck = false;
-								waitingForAckMonitor.notify();
+						outOfOrderAcknr = false;
+					case DATA:	
+						//notify the sender thread waiting for an ACK, even if in order data is received
+						if (!outOfOrderAcknr){
+							synchronized(waitingForAckMonitor){
+								if (isWaitingForAck){
+									isWaitingForAck = false;
+									waitingForAckMonitor.notify();
+								}
+							}
+						}
+						if(seg.getSegmentType() == TCPSegmentType.DATA){
+							//put the data in the buffer and send an ack
+							handleData(seg);
+
+							//notify the application thread of having received data
+							synchronized (recv_buf) {
+								recv_buf.notifyAll();
 							}
 						}
 						break;
