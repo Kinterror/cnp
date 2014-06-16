@@ -279,17 +279,25 @@ public class TCP {
 	        	try{
 	        		pck = recv_tcp_segment(timeout);
 	        		
+	        		//are the ports correct?
+	        		if(!tcb.checkValidAddress(pck)){
+	        			Log.d("sockRecv", "received packet with invalid address or port");
+	        			continue;
+	        		}
+	        		
+	        		//are the sequence numbers correct?
 		        	if(tcb.checkValidAddress(pck) && tcb.isInOrderPacket(pck)){
 		        		
-		        		//increment acknr if received non-ack packet
+		        		//increment acknr if received data, syn or fin packet
 		        		switch(pck.getSegmentType()){
-		        		case DATA:
-			        		tcb.getAndIncrementAcknr(pck.data.length);
+		        		case ACK:
+		        			break;
 			        	default:
+			        		tcb.getAndIncrementAcknr(pck.data.length);
 		        		}
 		        		outOfOrderAcknr = false;
 		        		break;
-		        	} else if (tcb.checkValidAddress(pck) && pck.seq_nr == tcb.getSeqnr() &&
+		        	} else if (pck.seq_nr == tcb.getSeqnr() &&
 		        			(pck.ack_nr == tcb.getPreviousExpectedSeqnr()) && 
 		        			pck.getSegmentType() == TCPSegmentType.DATA){
 		        		/*received data packet just after having sent a data packet by yourself
@@ -299,7 +307,7 @@ public class TCP {
 		        		outOfOrderAcknr = true;
 		        		break;
 		        	
-		        	} else if (tcb.checkValidAddress(pck) && pck.seq_nr == tcb.getPreviousExpectedSeqnr()){
+		        	} else if (pck.seq_nr == tcb.getPreviousExpectedSeqnr()){
 		        		/*
 			        	 * case of lost ack: we receive an old non-ack packet with the previous sequence number
 			        	 */
@@ -309,6 +317,7 @@ public class TCP {
 		        			//resend lost ack
 		        			TCPSegment ack = tcb.generatePreviousAck();
 	                		sockSend(ack);
+	                		continue;
 		        		case FIN:
 		        		case SYN:
 		        			//now the SYNACK or FINACK was lost. Let the caller handle the lost ack now.
@@ -318,12 +327,10 @@ public class TCP {
 		        			continue;
 		        		}
 		        		break;
-		        	} else if (tcb.checkValidAddress(pck)){
+		        	} else {
 		        		Log.d("sockRecv", "received incorrect (out of order) packet with sequence number " + pck.seq_nr + 
 		        				" and acknowledgement number " + pck.ack_nr + ". Expected seqnr: "+ tcb.getExpectedSeqnr() +
 		        				" or prev:" + tcb.getPreviousExpectedSeqnr()+ ", acknr" + tcb.getSeqnr());
-		        	} else {
-		        		Log.d("sockRecv", "received packet with invalid address or port");
 		        	}
 	        	} catch (InvalidPacketException e) {
 	        		//discard it
@@ -332,6 +339,10 @@ public class TCP {
         	return pck;
         }
         
+        /**
+         * waits for a segment to arrive. Checks the sequence number and ack number and resends lost acks.
+         * @return the packet that was received.
+         */
         private synchronized TCPSegment sockRecv() {
         	try{
         		return sockRecv(0);
@@ -342,7 +353,7 @@ public class TCP {
         }
         
         /**
-         * Sets the src and dest port right.
+         * Sets the src and dest port right and calls send_tcp_segment().
          * @param pck
          */
         private boolean sockSend(TCPSegment pck) {
@@ -805,7 +816,8 @@ public class TCP {
 		Log.d("recv_tcp_segment()", "received packet: " + tcp_packet.toString());
 		
 		//validate checksum
-		if (!tcp_packet.validateChecksum(ip_packet.source, ip_packet.destination)){
+		if (!tcp_packet.validateChecksum(ip_packet.source, ip_packet.destination) ||
+				tcp_packet.getSegmentType() == TCPSegmentType.INVALID){
 			//packet was corrupted because checksum is not correct
 			throw new InvalidPacketException("Invalid checksum");
 		}
