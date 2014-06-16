@@ -114,7 +114,7 @@ class TCPControlBlock{
 	 */
 	long getAndIncrementAcknr(long size){
 		previous_acknr = current_acknr;
-		current_acknr = (current_acknr + (size > 0 ? size : 1)) % UINT_32_MAX;
+		current_acknr = (current_acknr + size) % UINT_32_MAX;
 		return previous_acknr;
 	}
 
@@ -146,7 +146,9 @@ class TCPControlBlock{
 	}
 	
 	TCPSegment createControlSegment(TCPSegmentType st){
-		return new TCPSegment(local_port, remote_port, getAndIncrementSeqnr(0), current_acknr,
+		return new TCPSegment(local_port, remote_port, 
+				st == TCPSegmentType.SYN || st == TCPSegmentType.FIN ? getAndIncrementSeqnr(1) : getSeqnr(),
+				current_acknr,
 				st, new byte[0]);
 	}
 	

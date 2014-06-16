@@ -214,13 +214,15 @@ public class TCP {
         		tcb.setState(ConnectionState.S_CLOSE_WAIT);
         	case S_CLOSE_WAIT:
         		//send ack
-	        	ack = tcb.createControlSegment(TCPSegmentType.ACK);
+	        	tcb.getAndIncrementAcknr(1);
+        		ack = tcb.createControlSegment(TCPSegmentType.ACK);
 				sockSend(ack);
 				break;
         	case S_FIN_WAIT_1:
         		//simultaneous closing
         	case S_FIN_WAIT_2:
         		//send last ack
+        		tcb.getAndIncrementAcknr(1);
         		ack = tcb.createControlSegment(TCPSegmentType.ACK);
 				sockSend(ack);
 				tcb.setState(ConnectionState.S_TIME_WAIT);
@@ -277,7 +279,7 @@ public class TCP {
 		        		default:
 			        		tcb.getAndIncrementAcknr(pck.data.length);
 		        		}
-		        			
+		        		
 		        		break;
 		        	/*
 		        	 * case of lost ack: we receive an old non-ack packet with the previous sequence number
