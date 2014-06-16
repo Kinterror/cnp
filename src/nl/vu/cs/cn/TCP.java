@@ -448,7 +448,9 @@ public class TCP {
         	case S_FIN_WAIT_2:
         		synchronized(recv_buf){
 	        		/*check if there are maxlen bytes in the buffer. If not, block until enough data is available.*/
-	        		while(recv_buf.length() < maxlen){
+	        		while(recv_buf.length() < maxlen && 
+	        				tcb.getState() != ConnectionState.S_CLOSE_WAIT &&
+	        				tcb.getState() != ConnectionState.S_CLOSED){
 	        			//wait for the buffer to become filled again
 	        			try {
 							recv_buf.wait(1000);
