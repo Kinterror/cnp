@@ -2,6 +2,7 @@ package nl.vu.cs.cn;
 
 import java.util.Random;
 
+import android.util.Log;
 import nl.vu.cs.cn.IP.IpAddress;
 import nl.vu.cs.cn.TCPSegment.TCPSegmentType;
 
@@ -55,6 +56,7 @@ class TCPControlBlock{
 	}
 		
 	void setState(ConnectionState s){
+		Log.d("TCB", "state set to: " + s.name());
 		this.state = s;
 	}
 	
