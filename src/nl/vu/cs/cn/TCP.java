@@ -646,16 +646,18 @@ public class TCP {
 						//put the data in the buffer and send an ack
 						handleData(seg);
 						
-						//notify the sender thread of having received data
+						//notify the application thread of having received data
 						synchronized (recv_buf) {
 							recv_buf.notifyAll();
 						}
-						break;
+						/*do not break since data with the right sequence/ack numbers is regarded as an acknowledgement
+						* for the sent data.
+						*/
 					case ACK:
 						//notify the sender thread waiting for an ACK
-						if (isWaitingForAck){
-							isWaitingForAck = false;
-							synchronized(waitingForAckMonitor){
+						synchronized(waitingForAckMonitor){
+							if (isWaitingForAck){
+								isWaitingForAck = false;
 								waitingForAckMonitor.notify();
 							}
 						}
