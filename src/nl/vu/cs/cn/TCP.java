@@ -449,18 +449,13 @@ public class TCP {
         		synchronized(recv_buf){
 	        		/*check if there are maxlen bytes in the buffer. If not, block until enough data is available.*/
 	        		while(recv_buf.length() < maxlen && 
+	        				//check if the connection wasn't closed in the meantime
 	        				tcb.getState() != ConnectionState.S_CLOSE_WAIT &&
 	        				tcb.getState() != ConnectionState.S_CLOSED){
 	        			//wait for the buffer to become filled again
 	        			try {
 							recv_buf.wait(1000);
 						} catch (InterruptedException e) { e.printStackTrace(); }
-	        			
-	        			//check if the connection wasn't closed in the meantime
-	        			if (tcb.getState() == ConnectionState.S_CLOSE_WAIT ||
-	        					tcb.getState() == ConnectionState.S_CLOSED){
-	        				break;
-	        			}
 	        		}
 	        		return recv_buf.deBuffer(buf, offset, maxlen);
         		}
