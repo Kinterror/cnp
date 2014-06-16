@@ -536,7 +536,7 @@ public class TCP {
         	case S_CLOSE_WAIT:
         		tcb.setState(ConnectionState.S_LAST_ACK);
         		closePending = true;
-        		synchronized (waitingForAckMonitor) {
+        		synchronized (waitingForCloseMonitor) {
             		waitingForCloseMonitor.notifyAll();
 				}
         		return true;
@@ -627,14 +627,11 @@ public class TCP {
         			TCPSegment fin = tcb.createControlSegment(TCPSegmentType.FIN);
 
         			sendAndWaitAck(fin, false);
+        			//even if fin sending fails, close anyway
+        			tcb.setState(ConnectionState.S_CLOSED);
         		default:
         		}
-        		
-        		//even if fin sending fails, close anyway
-        		tcb.setState(ConnectionState.S_CLOSED);
-        		return;
 			}
-        	
         }
         
         private class ReceiverThread implements Runnable {
