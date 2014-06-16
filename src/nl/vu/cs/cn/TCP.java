@@ -18,7 +18,7 @@ public class TCP {
 	public static final int DEFAULT_CLIENT_PORT = 12345;
 	
 	/**MSL (maximum segment lifetime) (seconds) used in the connection termination timer*/
-	public static final int MSL = 10;
+	public static final int MSL = 2;
 	
 	/**maximum number of tries waiting for an ack*/
 	public static final int MAX_TRIES = 10;
@@ -343,6 +343,29 @@ public class TCP {
         	return true;
         }
         
+        /**
+         * sends packet and waits for an ack ir resends (max. 10 times) in the sender thread
+         */
+        private boolean sendAndWaitAckEstablished(TCPSegment pck, boolean doWaitForSynAck) {
+        	int ntries = 0;
+    		synchronized(waitingForAckMonitor){
+				isWaitingForAck = true;
+				do {
+					sockSend(pck);
+					/*there's an innocent race condition here that makes us lose one second
+					 * if this thread gets preempted here and the receive thread receives the
+					 * packet and calls notify before this thread has entered wait state.
+					 */
+					try {
+						//wait until the receiver thread receives an ack
+						waitingForAckMonitor.wait(1000);
+						
+					} catch (InterruptedException e) { e.printStackTrace(); }
+					ntries++;
+				} while (ntries < MAX_TRIES && isWaitingForAck);
+    		}
+    		return !isWaitingForAck;
+        }
         
         /**
          * wrapper for sockSend. try to send a packet and wait for the acknowledgment.
@@ -562,37 +585,17 @@ public class TCP {
 						}			
 						TCPSegment seg = tcb.createDataSegment(data);
 						
-						int ntries = 0;
-						
-						synchronized(waitingForAckMonitor){
-							isWaitingForAck = true;
-							do {
-								sockSend(seg);
-								/*there's an innocent race condition here that makes us lose one second
-								 * if this thread gets preempted here and the receive thread receives the
-								 * packet and calls notify before this thread has entered wait state.
-								 */
-								try {
-									//wait until the receiver thread receives an ack
-									waitingForAckMonitor.wait(1000);
-									
-								} catch (InterruptedException e) { e.printStackTrace(); }
-								ntries++;
-							} 
-							while (ntries < MAX_TRIES && isWaitingForAck);
-							
-							//check if ack was received or timeout
-							if (isWaitingForAck) {
-								Log.e("Connection broken", "number of retries expired for ack");
-								tcb.setState(ConnectionState.S_CLOSED);
-								System.exit(-1);
-							}
+						//check if ack was received or timeout
+						if (!sendAndWaitAckEstablished(seg, false)) {
+							Log.e("Connection broken", "number of retries expired for ack");
+							tcb.setState(ConnectionState.S_CLOSED);
+							System.exit(-1);
 						}
 					} else if (closePending && tcb.getState() == ConnectionState.S_FIN_WAIT_1){
-		        		//send fin
+						//send fin
 		        		TCPSegment fin = tcb.createControlSegment(TCPSegmentType.FIN);
 		        		
-		        		if (sendAndWaitAck(fin, false)){
+		        		if (sendAndWaitAckEstablished(fin, false)){
 		        			tcb.setState(ConnectionState.S_FIN_WAIT_2);
 		        			break;
 		        		}
