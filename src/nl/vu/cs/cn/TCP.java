@@ -292,12 +292,12 @@ public class TCP {
 		        		switch(pck.getSegmentType()){
 		        		case SYNACK:
 		        		case DATA:
-		        		case FIN:
 		        			//resend lost ack
 		        			TCPSegment ack = tcb.generatePreviousAck();
 	                		sockSend(ack);
+		        		case FIN:
 		        		case SYN:
-		        			//now the SYNACK was lost. 
+		        			//now the SYNACK or FINACK was lost. Let the caller handle the lost ack now.
 		        			break;
 		        		default:
 		        			//discard duplicate ACK or invalid old packet
