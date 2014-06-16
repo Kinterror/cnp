@@ -147,7 +147,7 @@ class TCPControlBlock{
 	
 	TCPSegment createControlSegment(TCPSegmentType st){
 		return new TCPSegment(local_port, remote_port, 
-				st == TCPSegmentType.SYN || st == TCPSegmentType.FIN ? getAndIncrementSeqnr(1) : getSeqnr(),
+				st == TCPSegmentType.SYN || st == TCPSegmentType.SYNACK || st == TCPSegmentType.FIN ? getAndIncrementSeqnr(1) : getSeqnr(),
 				current_acknr,
 				st, new byte[0]);
 	}
