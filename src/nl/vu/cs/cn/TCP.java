@@ -379,7 +379,12 @@ public class TCP {
 						return true;
 					case DATA:
 						handleData(seg);
-						break;
+						switch(tcb.getState()){
+						case S_SYN_RCVD:
+							return true;
+						default:
+							break;
+						}
 					case FIN:
 						handleIncomingFin();
 						break;
