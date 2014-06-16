@@ -59,7 +59,9 @@ public class TCP {
 		private volatile BoundedByteBuffer send_buf;
 		
 		private volatile boolean isWaitingForAck;
+		private volatile boolean closePending;
 		private Object waitingForAckMonitor;
+		private Object waitingForCloseMonitor;
 		
     	/** Construct a client socket. */
     	private Socket() {
@@ -74,7 +76,9 @@ public class TCP {
         private Socket(int port) {
         	isClientSocket = false;
         	isWaitingForAck = false;
+        	closePending = false;
         	waitingForAckMonitor = new Object();
+        	waitingForCloseMonitor = new Object();
         	tcb = new TCPControlBlock();
         	tcb.setLocalSocketAddress(new SocketAddress(ip.getLocalAddress(), port));
         	
@@ -380,6 +384,9 @@ public class TCP {
 					case DATA:
 						handleData(seg);
 						switch(tcb.getState()){
+						/*in case the ACK of the three way handshake was lost, regard the received data as an ACK and establish
+						* the connection
+						*/
 						case S_SYN_RCVD:
 							return true;
 						default:
@@ -523,28 +530,16 @@ public class TCP {
         public boolean close() {
         	switch(tcb.getState()){
         	case S_ESTABLISHED:
-        		//send fin
-        		TCPSegment fin = tcb.createControlSegment(TCPSegmentType.FIN);
-            	
         		tcb.setState(ConnectionState.S_FIN_WAIT_1);
-        		if (sendAndWaitAck(fin, false)){
-        			tcb.setState(ConnectionState.S_FIN_WAIT_2);
-        			return true;
-        		}
-        		//if we fail to receive a fin ack, force close
-        		tcb.setState(ConnectionState.S_CLOSED);
+        		closePending = true;
         		return true;
-            	
         	case S_CLOSE_WAIT:
-        		//send fin
-        		fin = tcb.createControlSegment(TCPSegmentType.FIN);
-            	
         		tcb.setState(ConnectionState.S_LAST_ACK);
-        		sendAndWaitAck(fin, false);
-        		
-        		//if fin sending fails, close anyway
-        		tcb.setState(ConnectionState.S_CLOSED);
-            	return true;
+        		closePending = true;
+        		synchronized (waitingForAckMonitor) {
+            		waitingForCloseMonitor.notifyAll();
+				}
+        		return true;
         	default:
         		Log.e("close() error", "can't close a non-open socket");
         		return false;
@@ -554,8 +549,9 @@ public class TCP {
         private class SenderThread implements Runnable {
         	public void run() {
 				//only send packets it the connections hasn't been closed yet
-				while(tcb.getState() == ConnectionState.S_ESTABLISHED || 
-						tcb.getState() == ConnectionState.S_CLOSE_WAIT){
+        		while(tcb.getState() == ConnectionState.S_ESTABLISHED || 
+						tcb.getState() == ConnectionState.S_CLOSE_WAIT ||
+						tcb.getState() == ConnectionState.S_FIN_WAIT_1){
 					if (!send_buf.isEmpty()){
 						
 						//create a new segment from the buffer
@@ -595,6 +591,17 @@ public class TCP {
 								System.exit(-1);
 							}
 						}
+					} else if (closePending && tcb.getState() == ConnectionState.S_FIN_WAIT_1){
+		        		//send fin
+		        		TCPSegment fin = tcb.createControlSegment(TCPSegmentType.FIN);
+		        		
+		        		if (sendAndWaitAck(fin, false)){
+		        			tcb.setState(ConnectionState.S_FIN_WAIT_2);
+		        			break;
+		        		}
+		        		//if we fail to receive a fin ack, force close
+		        		tcb.setState(ConnectionState.S_CLOSED);
+		        		return;
 					} else {
 						try {
 							synchronized (send_buf) {
@@ -603,7 +610,31 @@ public class TCP {
 						} catch (InterruptedException e) { e.printStackTrace(); }
 					}
 				}
+        		//wait for the application to close the connection
+        		while (!closePending){
+        			synchronized(waitingForCloseMonitor){
+        				try {
+							waitingForCloseMonitor.wait(1000);
+						} catch (InterruptedException e) {
+							e.printStackTrace();
+						}
+        			}
+        		}
+        		
+        		switch(tcb.getState()){
+        		case S_LAST_ACK:
+        			//send fin
+        			TCPSegment fin = tcb.createControlSegment(TCPSegmentType.FIN);
+
+        			sendAndWaitAck(fin, false);
+        		default:
+        		}
+        		
+        		//even if fin sending fails, close anyway
+        		tcb.setState(ConnectionState.S_CLOSED);
+        		return;
 			}
+        	
         }
         
         private class ReceiverThread implements Runnable {
