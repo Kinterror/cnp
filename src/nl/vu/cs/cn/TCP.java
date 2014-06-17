@@ -776,7 +776,9 @@ public class TCP {
     	
     	//log for debugging details
     	Log.d("send_tcp_segment()","Packet to be sent: " + p.toString());
-    	Log.d("send_tcp_segment()","to IP : " + destination.toString() + " at port : " + p.dest_port);
+    	Log.d("send_tcp_segment()","to IP : " + destination.toString() + " at port : " + p.dest_port + "From IP: " +
+    	source + " at port " + p.src_port);
+    	Log.d("send_tcp_segment()","Other pseudo header fields - length: " + bytes.length + " protocol: " + IP.TCP_PROTOCOL);
     	
     	//send packet
     	ip.ip_send(ip_packet);

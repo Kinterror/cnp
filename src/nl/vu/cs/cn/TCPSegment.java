@@ -18,7 +18,7 @@ class TCPSegment{
 	short checksum;
 	//sequence numbers
 	long seq_nr, ack_nr;
-	public static final byte DATA_OFFSET = 0x05;
+	static final byte DATA_OFFSET = 0x05;
 	
 	byte[] data;
 	
@@ -250,6 +250,8 @@ class TCPSegment{
 			//add zero padding byte
 			sum += temp_array[i]<<8;
 		}
+		
+		//wrap around if sum is too large
 		while(sum>>16 != 0){
 			sum = (sum>>16) + (sum & 0x0000FFFF);
 		}
