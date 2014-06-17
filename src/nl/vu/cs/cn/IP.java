@@ -259,5 +259,4 @@ public class IP {
      */
     public native void ip_receive_timeout(Packet p, int timeout)
 	throws IOException, InterruptedException;
-
 }
