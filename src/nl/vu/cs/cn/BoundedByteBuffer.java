@@ -21,6 +21,14 @@ public class BoundedByteBuffer {
 	}
 	
 	/**
+	 * initializes this buffer to an empty buffer again
+	 */
+	public void init(){
+		list.clear();
+		length = 0;
+	}
+	
+	/**
 	 * Adds bytes to the buffer
 	 * @param arr
 	 * @throws FullCollectionException

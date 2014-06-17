@@ -18,7 +18,7 @@ class TCPControlBlock{
 	enum ConnectionState
 	{
 		S_CLOSED, S_LISTEN, S_SYN_SENT, S_SYN_RCVD, S_ESTABLISHED,
-		S_FIN_WAIT_1, S_FIN_WAIT_2, S_CLOSE_WAIT, S_LAST_ACK, S_TIME_WAIT
+		S_FIN_WAIT_1, S_FIN_WAIT_2, S_CLOSE_WAIT, S_LAST_ACK, S_TIME_WAIT, S_CLOSING
 	}
 		
 	private ConnectionState state;
