@@ -767,6 +767,12 @@ public class TCP {
     	//encode tcp packet
     	byte[] bytes = p.encode();
     	
+        StringBuilder sb = new StringBuilder();
+        for (byte b : bytes) {
+            sb.append(String.format("%02X ", b));
+        }
+    	
+    	Log.d("send_tcp_segment()","Packet bytes: " + sb.toString());
     	    	
     	//create new packet and increment ID counter
     	Packet ip_packet = new Packet(destIpInt, IP.TCP_PROTOCOL, ip_packet_id,
