@@ -263,12 +263,12 @@ class TCPSegment{
 		int i = 0;
 		int tcplen;
 		for(tcplen = temp_array.length; tcplen > 1; tcplen-=2){
-			sum += ((char)temp_array[i])<<8 | ((char)temp_array[i+1]);
+			sum += ((short)temp_array[i] & 0x00ff)<<8 | ((short)temp_array[i+1] & 0x00ff);
 			i += 2;
 		}
 		if (tcplen > 0){
 			//add zero padding byte
-			sum += temp_array[i]<<8;
+			sum += ((short) temp_array[i] & 0x00ff)<<8;
 		}
 		
 		//wrap around if sum is too large
@@ -277,7 +277,7 @@ class TCPSegment{
 		}
 		
 		//one's complement
-		return (short) (sum ^ 0xffff);
+		return (short) ((sum & 0xffff) ^ 0xffff);
 	}
 	
 	/**
