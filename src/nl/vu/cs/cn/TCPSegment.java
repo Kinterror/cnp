@@ -204,6 +204,14 @@ class TCPSegment{
     			syn, ack, fin, data, checksum);
 	}
 	
+	/**
+	 * converts big-endian network order address to little-endian
+	 * @param address
+	 * @return
+	 */
+	int ntohl(int address){
+		return (address & 0x000000ff) <<6 | (address & 0x0000ff00) <<2 | (address & 0x00ff0000) >>2 | (address & 0xff000000)>>6;
+	}
 	
 	/**
 	 * Compute the checksum of a TCP segment. 
@@ -216,13 +224,16 @@ class TCPSegment{
 	short calculate_checksum(int source, int dest, int protocol){
 		int sum = 0;
 		
+		int srcLE = ntohl(source);
+		int destLE = ntohl(dest);
+		
 		//add source address
-		sum += (source>>16) & 0xffff;
-		sum += (source & 0xffff);
+		sum += (srcLE>>16) & 0xffff;
+		sum += (srcLE & 0xffff);
 		
 		//add destination address
-		sum += (dest>>16) & 0xffff;
-		sum += (dest & 0xffff);
+		sum += (destLE>>16) & 0xffff;
+		sum += (destLE & 0xffff);
 		
 		//add protocol (and zeroes)
 		sum += protocol & 0xff;
