@@ -210,10 +210,16 @@ class TCPSegment{
 	 * @return
 	 */
 	public static int ntohl(int address){
-		return ((address & 0x000000ff) <<6) |
-				((address & 0x0000ff00) <<2) |
-				((address & 0x00ff0000) >>2) |
-				((address & 0xff000000)>>6);
+		int tmp = (address & 0x000000ff) <<6;
+		tmp |= (address & 0x0000ff00) <<2;
+		tmp |= (address & 0x00ff0000) >>2;
+		tmp |= (address & 0xff000000) >>6;
+		return tmp;
+		
+//		return ((address & 0x000000ff) <<6) |
+//				((address & 0x0000ff00) <<2) |
+//				((address & 0x00ff0000) >>2) |
+//				((address & 0xff000000)>>6);
 	}
 	
 	/**
