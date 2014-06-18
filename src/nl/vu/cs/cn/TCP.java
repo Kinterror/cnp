@@ -392,8 +392,8 @@ public class TCP {
 					}
         		} catch (InterruptedException e) {
         			return false;
-        		} catch (InvalidPacketException e) {
-        			//do nothing
+        		} catch (InvalidPacketException e1) {
+        			Log.e("waitForSynack", "Invalid packet: " + e1.getMessage());
         		}
         	}
         }
@@ -832,9 +832,14 @@ public class TCP {
 		Log.d("recv_tcp_segment()", "received packet: " + tcp_packet.toString());
 		
 		//validate checksum
-		if (!tcp_packet.validateChecksum(ip_packet.source, ip_packet.destination)){
+		int sourceip = ip_packet.source;
+		int destip = ip_packet.destination;
+		
+		if (!tcp_packet.validateChecksum(sourceip, destip)){
 			//packet was corrupted because checksum is not correct
-			throw new InvalidPacketException("Invalid checksum");
+			throw new InvalidPacketException("Invalid checksum. Expected: " + 
+			 tcp_packet.calculate_checksum(sourceip, destip, IP.TCP_PROTOCOL) +
+			 ". Received: " + tcp_packet.checksum);
 		} else if (tcp_packet.getSegmentType() == TCPSegmentType.INVALID){
 			throw new InvalidPacketException("Invalid flags");
 		}
