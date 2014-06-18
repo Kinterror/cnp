@@ -266,6 +266,7 @@ class TCPSegment{
 			sum += ((short)temp_array[i] & 0x00ff)<<8 | ((short)temp_array[i+1] & 0x00ff);
 			i += 2;
 		}
+		
 		if (tcplen > 0){
 			//add zero padding byte
 			sum += ((short) temp_array[i] & 0x00ff)<<8;
