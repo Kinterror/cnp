@@ -767,6 +767,7 @@ public class TCP {
     	//encode tcp packet
     	byte[] bytes = p.encode();
     	
+    	//hexdump the packet for debugging
         StringBuilder sb = new StringBuilder();
         for (byte b : bytes) {
             sb.append(String.format("%02X ", b));

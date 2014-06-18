@@ -257,7 +257,7 @@ class TCPSegment{
 		}
 		
 		//one's complement
-		return (short) ~sum;
+		return (short) (sum ^ 0xffff);
 	}
 	
 	/**
