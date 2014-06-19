@@ -217,8 +217,10 @@ public class TCP {
 	        			continue;
 	        		}
 	        		
-	        		//are the sequence numbers correct?
-		        	if(tcb.checkValidAddress(pck) && tcb.isInOrderPacket(pck)){
+	        		/*
+	        		 * received a packet with the correct sequence number
+	        		 */
+		        	if(tcb.isInOrderPacket(pck)){
 		        		
 		        		//increment acknr if received data, syn or fin packet
 		        		switch(pck.getSegmentType()){
@@ -229,20 +231,24 @@ public class TCP {
 		        		}
 		        		outOfOrderAcknr = false;
 		        		break;
-		        	} else if (pck.seq_nr == tcb.getSeqnr() &&
+		        	}
+	        		/*
+	        		 * received data packet just after having sent a data packet by yourself
+	        		 * therefore, the acknr is one too old.
+	        		 */
+		        	else if (pck.seq_nr == tcb.getSeqnr() &&
 		        			(pck.ack_nr == tcb.getPreviousExpectedSeqnr()) && 
 		        			pck.getSegmentType() == TCPSegmentType.DATA){
-		        		/*received data packet just after having sent a data packet by yourself
-		        		 * therefore, the acknr is one too old
-		        		 */
+		        		
 		        		tcb.getAndIncrementAcknr(pck.data.length);
 		        		outOfOrderAcknr = true;
 		        		break;
-		        	
-		        	} else if (pck.seq_nr == tcb.getPreviousExpectedSeqnr()){
-		        		/*
-			        	 * case of lost ack: we receive an old non-ack packet with the previous sequence number
-			        	 */
+		        	}
+		        	/* 
+		        	 * case of lost ack: we receive an old non-ack packet with the previous sequence number
+		        	 */
+		        	else if (pck.seq_nr == tcb.getPreviousExpectedSeqnr()){
+		        		
 		        		switch(pck.getSegmentType()){
 		        		case SYNACK:
 		        		case DATA:
@@ -252,10 +258,14 @@ public class TCP {
 	                		continue;
 		        		case FIN:
 		        		case SYN:
+		        			Log.d("sockRecv", "received retransmitted FIN/SYN.");
 		        			//now the SYNACK or FINACK was lost. Let the caller handle the lost ack now.
 		        			break;
+		        		case ACK:
+		        			Log.d("sockRecv", "received duplicate ACK, discarding it.");
+		        			continue;
 		        		default:
-		        			//discard duplicate ACK or invalid old packet
+		        			Log.d("sockRecv", "received invalid old packet, discarding it.");
 		        			continue;
 		        		}
 		        		break;
@@ -265,7 +275,7 @@ public class TCP {
 		        				" or prev:" + tcb.getPreviousExpectedSeqnr()+ ", acknr" + tcb.getSeqnr());
 		        	}
 	        	} catch (InvalidPacketException e) {
-	        		//discard it
+	        		Log.d("sockRecv", "Invalid packet: " + e.getMessage());
 	        	}
         	}
         	return pck;
@@ -381,14 +391,24 @@ public class TCP {
         		try {
 					TCPSegment seg = recv_tcp_segment(timeout);
 					//check if it has the right socket address, acknr, and the right type
-					if (seg.getSegmentType() == TCPSegmentType.SYNACK &&
+					TCPSegmentType type = seg.getSegmentType();
+					if (type == TCPSegmentType.SYNACK &&
 							tcb.checkValidAddress(seg) &&
 							seg.ack_nr == tcb.getSeqnr()){ //no data expected, so 1 corresponds to a control packet
 						//initialize acknr of client
 						tcb.initClient(seg);
 						return true;
-					} else if (seg.ack_nr != tcb.getSeqnr()){
-						Log.e("waitForSynAck()", "received acknr " + seg.ack_nr + ". Expected: " + tcb.getSeqnr());
+					} else {
+						if (seg.ack_nr != tcb.getSeqnr()){
+							Log.e("waitForSynAck()", "received acknr " + seg.ack_nr + ". Expected: " + tcb.getSeqnr());
+						} 
+						if (!tcb.checkValidAddress(seg)){
+							Log.e("waitForSynAck()", "incorrect address/port: got port " + seg.dest_port + " on address "
+									+ seg.source_ip.toString());
+						} 
+						if (type != TCPSegmentType.SYNACK) {
+							Log.e("waitForSynAck()", "received unexpected packet: " + type.name());
+						}
 					}
         		} catch (InterruptedException e) {
         			return false;
@@ -428,6 +448,7 @@ public class TCP {
 	        		return recv_buf.deBuffer(buf, offset, maxlen);
         		}
         	default:
+        		Log.e("write()", "can't read: no connection established");
         		return -1;
         	}
         }
@@ -479,6 +500,7 @@ public class TCP {
         		}
         		return len;
         	default:
+        		Log.e("write()", "can't write: no connection established");
         		return -1;
         	}
         }
@@ -580,6 +602,7 @@ public class TCP {
 				tcb.setState(ConnectionState.S_CLOSED);
 				break;
         	default:
+        		Log.d("handleIncomingFin", "received FIN packet in state: " + tcb.getState().name());
         		//do nothing
         	}
         }
@@ -590,14 +613,16 @@ public class TCP {
         		while(tcb.getState() == ConnectionState.S_ESTABLISHED || 
 						tcb.getState() == ConnectionState.S_CLOSE_WAIT ||
 						tcb.getState() == ConnectionState.S_FIN_WAIT_1){
+        			//there are packets due to be sent
 					if (!send_buf.isEmpty()){
 						
 						//create a new segment from the buffer
 						byte[] temp = new byte[MAX_TCPIP_SEGMENT_SIZE];
 						int size = send_buf.deBuffer(temp, 0, MAX_TCPIP_SEGMENT_SIZE);
-						byte[] data = new byte[size];
 						
 						//copy data into smaller array to be sent
+						byte[] data = new byte[size];
+						
 						for (int i = 0; i < size; i++) {
 							data[i] = temp[i];
 						}			
@@ -627,6 +652,7 @@ public class TCP {
 		        		tcb.setState(ConnectionState.S_CLOSED);
 		        		return;
 					} else {
+						//no packet due
 						try {
 							synchronized (send_buf) {
 								send_buf.wait(1000);
@@ -701,7 +727,7 @@ public class TCP {
 						handleIncomingFin();
 						break;
 					default:
-						//do nothing
+						Log.d("receiverThread", "received unexpected packet type: " + seg.getSegmentType().name());
 					}
 				}
 			}
@@ -752,8 +778,7 @@ public class TCP {
      * packet through the IP layer
      * @return -
      * @param destination IP
-     * @param packet id
-     * @param packet
+     * @param the TCP packet to be sent
      * @throws IOException 
      */
 	void send_tcp_segment(IpAddress destination, TCPSegment p) throws IOException{
@@ -772,7 +797,6 @@ public class TCP {
         for (byte b : bytes) {
             sb.append(String.format("%02X ", b));
         }
-    	
     	Log.d("send_tcp_segment()","Packet bytes: " + sb.toString());
     	    	
     	//create new packet and increment ID counter
@@ -822,6 +846,13 @@ public class TCP {
 				|| ip_packet.data.length < ip_packet.length){
 			throw new InvalidPacketException("Packet too short");
 		}
+		
+		//hexdump the packet for debugging
+        StringBuilder sb = new StringBuilder();
+        for (int i = 0; i < ip_packet.length; i++) {
+            sb.append(String.format("%02X ", ip_packet.data[i]));
+        }
+    	Log.d("recv_tcp_segment()","Packet bytes: " + sb.toString());
 		
 		//parse packet
 		TCPSegment tcp_packet = TCPSegment.decode(ip_packet.data, ip_packet.length);
