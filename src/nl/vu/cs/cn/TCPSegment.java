@@ -11,14 +11,16 @@ class TCPSegment{
 	int src_port, dest_port;
 	//unused flags. See RFC 793 for more details.
 	//these fields' semantics are not supported in this implementation. They exist just for the sake of completeness.
-	int ns, cwr, ece, urg, rst;
-	int window_size, urgent_pointer;
+	byte ns, cwr, ece, urg, rst;
+	int windowSize, urgent_pointer;
+	byte reserved;
 	//used flags.
 	int ack, psh, syn, fin;
 	short checksum;
 	//sequence numbers
 	long seq_nr, ack_nr;
-	static final byte DATA_OFFSET = 0x05;
+	//data offset
+	byte dataOffset;
 	
 	byte[] data;
 	
@@ -53,7 +55,7 @@ class TCPSegment{
 
 		//set other flags unused by this implementation
 		cwr = 0; ece = 0; urg = 0; psh = 1; rst = 0; ns = 0; 
-		window_size = 1; urgent_pointer = 0;
+		windowSize = 1; urgent_pointer = 0; dataOffset = 0x05; reserved = 0;
 		
 		//set other fields
 		this.src_port = src_port;
@@ -125,7 +127,9 @@ class TCPSegment{
 			result[i] = (byte) (ack_nr>>(24 - (i - 8) * 8));
 		}
 		//add flags
-		result[12] = (byte) ((DATA_OFFSET << 4) | (byte) ns); //unused 3 bits are 0
+		result[12] = (byte) ((dataOffset << 4) |
+				((reserved & 0x07) <<1) |
+				(ns & 0x01));
 		result[13] = (byte) (((byte) (cwr <<7)) |
 				((byte) (ece <<6)) |
 				((byte) (urg <<5)) |
@@ -135,8 +139,8 @@ class TCPSegment{
 				((byte) (syn <<1)) |
 				((byte) fin));
 		//add window size
-		result[14] = (byte) (window_size >>8);
-		result[15] = (byte) window_size;
+		result[14] = (byte) (windowSize >>8);
+		result[15] = (byte) windowSize;
 		
 		//add checksum
 		result[16] = (byte) (checksum >>8);
@@ -162,29 +166,48 @@ class TCPSegment{
 	 * @return TCPSegment deserialized from array
 	 */
 	static TCPSegment decode(byte[] array, int length){
+		//src port
 		int src_port = (((int) array[0] & 0xFF) <<8) | ((int)array[1] & 0xFF);
 		
+		//dest port
 		int dest_port = (((int) array[2] & 0xFF) <<8) | ((int)array[3] & 0xFF);
 		
-		long seq_nr = 0, ack_nr = 0;
-		
+		//seqnr
+		long seq_nr = 0;
 		for(int i = 4; i < 8; i++){
 			//convert the four bytes into one long (not int because of signedness
-			int shift = 24 - 8 * (i - 4); //
+			int shift = 24 - 8 * (i - 4); //number of positions to shift the byte
 			
-			long intermediate = (long) (array[i] & 0xFF);
+			long temp = (long) array[i] & 0xFF; //get the byte
 			
-			seq_nr |= (intermediate<<shift);
+			seq_nr |= (temp<<shift);
 		}
+		
+		//acknr
+		long ack_nr = 0;
 		for(int i = 8; i < 12; i++){
 			//here be dragons
 			ack_nr |= ((long) (array[i]) & 0xFF) <<(24 - 8 * (i - 8));
 		}
 		
-		//skip result[12]
-		int ack = (int)((array[13] & 0x10) >>4);
-		int syn = (int)((array[13] & 0x02) >>1);
-		int fin = (int)(array[13] & 0x01);
+		//offset, reserved and ns flag
+		byte offset = (byte) ((array[12] & 0xF0) >>4);
+		byte res = (byte) ((array[12] & 0x07) >>1);
+		byte ns = (byte) (array[12] & 0x01);
+		
+		//flags
+		byte cwr = (byte) ((array[13] & 0x80) >>7);
+		byte ece = (byte) ((array[13] & 0x40) >>6);
+		byte urg = (byte) ((array[13] & 0x20) >>5);
+		int ack = (array[13] & 0x10) >>4;
+		
+		int psh = (array[13] & 0x08) >>3;
+		byte rst = (byte)((array[13] & 0x04) >>2);
+		int syn = (array[13] & 0x02) >>1;
+		int fin = array[13] & 0x01;
+		
+		//window size
+		int windowSize = (((int) array[14]) & 0xff) | (((int) array[15]) & 0xff);
 		
 		//left part of checksum, useful for debugging (Java Signedness is bothersome)
 		int c1 = ((int) array[16]) & 0xFF;
@@ -200,8 +223,22 @@ class TCPSegment{
     		data[i] = array[i + HEADER_LENGTH];
     	}
 		
-		return new TCPSegment(src_port, dest_port, seq_nr, ack_nr,
+		//construct new segment
+		TCPSegment ret =  new TCPSegment(src_port, dest_port, seq_nr, ack_nr,
     			syn, ack, fin, data, checksum);
+		
+		//add other flags
+		ret.dataOffset = offset;
+		ret.reserved = res;
+		ret.ns = ns;
+		ret.cwr = cwr;
+		ret.ece = ece;
+		ret.urg = urg;
+		ret.psh = psh;
+		ret.rst = rst;
+		ret.windowSize = windowSize;
+		
+		return ret;
 	}
 	
 	/**
