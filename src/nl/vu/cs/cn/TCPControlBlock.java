@@ -47,7 +47,6 @@ class TCPControlBlock{
 		generateSeqnr();
 		previous_acknr = s.seq_nr;
 		current_acknr = s.seq_nr + 1;
-		setState(ConnectionState.S_SYN_RCVD);
 	}
 	
 	void initClient(TCPSegment s){

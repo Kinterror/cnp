@@ -155,7 +155,7 @@ public class TCP {
         	send_buf.init();
         	recv_buf.init();
         	
-        	//receive stuff
+        	//receive incoming packets
         	while (tcb.getState() != ConnectionState.S_ESTABLISHED){
 	        	
         		//listen for incoming connections
@@ -167,15 +167,23 @@ public class TCP {
 	            	//receive a packet from the network
 					try {
 						syn_pck = recv_tcp_segment(0);
-					} catch (Exception e){
+					} catch(InvalidPacketException e){
+						Log.d("accept", "Received invalid packet: " + e.getMessage());
+						continue;
+					} catch (Exception e1){
 						continue;
 					}
 					if(syn_pck.getSegmentType() == TCPSegmentType.SYN)
 					{
-						//initialize the connection state to S_SYN_RCVD
+						//initialize the tcb with the right sequence numbers, ports and IP addresses
 						tcb.initServer(syn_pck);
+						tcb.setState(ConnectionState.S_SYN_RCVD);
+					} else {
+						//else, discard it and listen again.
+						Log.d("accept", "Received invalid packet type: " + syn_pck.getSegmentType().name() + 
+								" instead of SYN");
 					}
-					//else, discard it and listen again.
+					
 	            }
 	            
 	            //compose a synack message
