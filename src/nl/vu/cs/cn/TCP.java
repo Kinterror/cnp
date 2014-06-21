@@ -796,9 +796,13 @@ public class TCP {
 		//encode tcp packet
     	byte[] bytes = p.encode();
 		
-		//calculate and set checksum
+		//calculate checksum
     	int source = ip.getLocalAddress().getAddress();
-    	p.checksum = TCPSegment.calculateChecksum(source, destIpInt, bytes.length, bytes);
+    	short checksum = p.checksum = TCPSegment.calculateChecksum(source, destIpInt, bytes.length, bytes);
+    	
+    	//add checksum to packet bytes
+    	bytes[TCPSegment.CHECKSUM_OFFSET] = (byte) ((checksum >>8) & 0x00ff);
+    	bytes[TCPSegment.CHECKSUM_OFFSET + 1] = (byte) ((checksum) & 0x00ff);
     	
     	//hexdump the packet for debugging
         StringBuilder sb = new StringBuilder();

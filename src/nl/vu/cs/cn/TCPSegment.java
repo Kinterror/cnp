@@ -33,6 +33,7 @@ class TCPSegment{
 	
 	//these fields are not formally a part of the TCP header; however, in our implementation they are used. 
 	static final int HEADER_LENGTH = 20;
+	static final int CHECKSUM_OFFSET = 16;
 	IpAddress source_ip;
 	
 	/**constructor without checksum*/
@@ -265,7 +266,6 @@ class TCPSegment{
 	 * @return the checksum
 	 */
 	static short calculateChecksum(int source, int dest, int length, byte[] pck){
-		final int CHECKSUM_OFFSET = 16;
 		int calcCs = 0;
 		
 		//get left part of checksum, useful for debugging (Java Signedness is bothersome)
