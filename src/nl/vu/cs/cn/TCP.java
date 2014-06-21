@@ -119,7 +119,6 @@ public class TCP {
         	//send it and wait for a synack
         	tcb.setState(ConnectionState.S_SYN_SENT);
         	if (sendAndWaitAck(syn_pck, true)){
-        		
         		//send ack
         		TCPSegment ack = tcb.createControlSegment(TCPSegmentType.ACK);
         		sockSend(ack);
