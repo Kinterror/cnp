@@ -793,12 +793,12 @@ public class TCP {
     	//get integer value of IPAddress
 		int destIpInt = destination.getAddress();
 		
-    	//calculate and set checksum
-    	int source = ip.getLocalAddress().getAddress();
-    	p.checksum = p.calculate_checksum(source, destIpInt, IP.TCP_PROTOCOL);
-    	    	
-    	//encode tcp packet
+		//encode tcp packet
     	byte[] bytes = p.encode();
+		
+		//calculate and set checksum
+    	int source = ip.getLocalAddress().getAddress();
+    	p.checksum = TCPSegment.calculateChecksum(source, destIpInt, bytes.length, bytes);
     	
     	//hexdump the packet for debugging
         StringBuilder sb = new StringBuilder();
@@ -821,7 +821,6 @@ public class TCP {
     	
     	//send packet
     	ip.ip_send(ip_packet);
-		
     }
     
 	
@@ -845,9 +844,17 @@ public class TCP {
 			return null;
 		}
     	
+    	//hexdump the packet for debugging
+        StringBuilder sb = new StringBuilder();
+        for (int i = 0; i < ip_packet.length; i++) {
+            sb.append(String.format("%02X ", ip_packet.data[i]));
+        }
+    	Log.d("recv_tcp_segment()","Packet bytes: " + sb.toString());
+    	
+    	//wrong protocol
     	if(ip_packet.protocol != IP.TCP_PROTOCOL){
 			//not for me
-			return null;
+    		throw new InvalidPacketException("Wrong protocol. Ecpected TCP");
 		}
 		//packet is too short to parse
 		if(ip_packet.length < TCPSegment.HEADER_LENGTH || ip_packet.data.length < TCPSegment.HEADER_LENGTH 
@@ -855,34 +862,26 @@ public class TCP {
 			throw new InvalidPacketException("Packet too short");
 		}
 		
-		//hexdump the packet for debugging
-        StringBuilder sb = new StringBuilder();
-        for (int i = 0; i < ip_packet.length; i++) {
-            sb.append(String.format("%02X ", ip_packet.data[i]));
-        }
-    	Log.d("recv_tcp_segment()","Packet bytes: " + sb.toString());
-		
 		//parse packet
 		TCPSegment tcp_packet = TCPSegment.decode(ip_packet.data, ip_packet.length);
 		
-		//get source IP address which is used by the higher layers
-		tcp_packet.source_ip = IpAddress.getAddress(ip_packet.source);
-		
-		Log.d("recv_tcp_segment()", "received packet: " + tcp_packet.toString());
-		
-		//validate checksum
-		int sourceip = ip_packet.source;
-		int destip = ip_packet.destination;
-		
-		if (!tcp_packet.validateChecksum(sourceip, destip)){
+    	//validate checksum
+    	int sourceip = ip_packet.source;
+    	int destip = ip_packet.destination;
+    	int checksum = TCPSegment.calculateChecksum(sourceip, destip, ip_packet.length, ip_packet.data);
+    	
+    	if (checksum != tcp_packet.checksum){
 			//packet was corrupted because checksum is not correct
-			throw new InvalidPacketException("Invalid checksum. Expected: " + 
-			 tcp_packet.calculate_checksum(sourceip, destip, IP.TCP_PROTOCOL) +
-			 ". Received: " + tcp_packet.checksum);
+			throw new InvalidPacketException("Invalid checksum. Expected: " + checksum + ". Received: " + tcp_packet.checksum);
 		} else if (tcp_packet.getSegmentType() == TCPSegmentType.INVALID){
 			throw new InvalidPacketException("Invalid flags");
 		}
+    	
+    	//get source IP address which is used by the higher layers
+		tcp_packet.source_ip = IpAddress.getAddress(ip_packet.source);
 		
+		Log.d("recv_tcp_segment()", "received packet: " + tcp_packet.toString());
+    	
 		return tcp_packet;
     }
 }

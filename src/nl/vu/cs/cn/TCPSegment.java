@@ -78,6 +78,9 @@ class TCPSegment{
 		}
 	}
 	
+	/**
+	 * sets the right control flags according to the specified segment type.
+	 */
 	void setControlFlags(TCPSegmentType st){
 		//set flags
 		syn = ack = fin = 0;
@@ -247,12 +250,6 @@ class TCPSegment{
 	 * @return
 	 */
 	public static int ntohl(int address){
-//		int tmp = (address & 0x000000ff) <<24;
-//		tmp |= (address & 0x0000ff00) <<8;
-//		tmp |= (address & 0x00ff0000) >>8;
-//		tmp |= (address & 0xff000000) >>24;
-//		return tmp;
-		
 		return ((address & 0x000000ff) <<24) |
 				((address & 0x0000ff00) <<8) |
 				((address & 0x00ff0000) >>8) |
@@ -267,66 +264,66 @@ class TCPSegment{
 	 * @param protocol
 	 * @return the checksum
 	 */
-	short calculate_checksum(int source, int dest, int protocol){
-		int sum = 0;
+	static short calculateChecksum(int source, int dest, int length, byte[] pck){
+		final int CHECKSUM_OFFSET = 16;
+		int calcCs = 0;
 		
-		int srcLE = ntohl(source);
-		int destLE = ntohl(dest);
+		//get left part of checksum, useful for debugging (Java Signedness is bothersome)
+		byte c1 = pck[CHECKSUM_OFFSET];
+		//get right part
+		byte c2 = pck[CHECKSUM_OFFSET + 1];
+		
+		//zero out old checksum
+		pck[CHECKSUM_OFFSET] = 0; pck[CHECKSUM_OFFSET + 1] = 0;
+		
+		/*
+		 *pseudo header 
+		 */
 		
 		//add source address
-		sum += (srcLE>>16) & 0xffff;
-		sum += (srcLE & 0xffff);
+		int srcLE = ntohl(source);
+		calcCs += (srcLE>>16) & 0xffff;
+		calcCs += (srcLE & 0xffff);
 		
 		//add destination address
-		sum += (destLE>>16) & 0xffff;
-		sum += (destLE & 0xffff);
-		
+		int destLE = ntohl(dest);
+		calcCs += (destLE>>16) & 0xffff;
+		calcCs += (destLE & 0xffff);
+				
 		//add protocol (and zeroes)
-		sum += protocol & 0xff;
-		
+		calcCs += IP.TCP_PROTOCOL & 0xff;
+				
 		//add length
-		sum += (data.length + HEADER_LENGTH) & 0xffff;
+		calcCs += length & 0xffff;
 		
-		//temporarily write away the checksum field
-		short temp = checksum;
-		checksum = 0;
-		
-		//add tcp header. For readability and making the computation of the checksum easier, we encode it here.
-		byte[] temp_array = encode();
-		
-		//set back checksum field
-		checksum = temp;
+		/*
+		 * packet
+		 */
 		
 		int i = 0;
 		int tcplen;
-		for(tcplen = temp_array.length; tcplen > 1; tcplen-=2){
-			sum += ((short)temp_array[i] & 0x00ff)<<8 | ((short)temp_array[i+1] & 0x00ff);
+		for(tcplen = length; tcplen > 1; tcplen-=2){
+			calcCs += ((short)pck[i] & 0x00ff)<<8 | ((short)pck[i+1] & 0x00ff);
 			i += 2;
 		}
 		
 		if (tcplen > 0){
 			//add zero padding byte
-			sum += ((short) temp_array[i] & 0x00ff)<<8;
+			calcCs += ((short) pck[i] & 0x00ff)<<8;
 		}
 		
 		//wrap around if sum is too large
-		while(sum>>16 != 0){
-			sum = (sum>>16) + (sum & 0x0000FFFF);
+		while(calcCs>>16 != 0){
+			calcCs = (calcCs>>16) + (calcCs & 0x0000FFFF);
 		}
 		
 		//one's complement
-		return (short) ((sum ^ 0xffff) & 0xffff);
-	}
-	
-	/**
-	 * Compare two checksums to see if they match.
-	 * 
-	 * @param source
-	 * @param dest
-	 * @return true if the checksums match
-	 */
-	boolean validateChecksum(int source, int dest){
-		return (checksum == calculate_checksum(source, dest, IP.TCP_PROTOCOL));
+		calcCs = ((calcCs ^ 0xffff) & 0xffff);
+		
+		//write back old checksum
+		pck[CHECKSUM_OFFSET] = (byte) c1; pck[CHECKSUM_OFFSET + 1] = (byte) c2;
+		
+		return (short) calcCs;
 	}
 	
 	/**
