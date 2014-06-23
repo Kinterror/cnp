@@ -144,7 +144,8 @@ class TCPControlBlock{
 	
 	TCPSegment createControlSegment(TCPSegmentType st){
 		return new TCPSegment(local_port, remote_port, 
-				st == TCPSegmentType.SYN || st == TCPSegmentType.SYNACK || st == TCPSegmentType.FIN ? getAndIncrementSeqnr(1) : getSeqnr(),
+				st == TCPSegmentType.SYN || st == TCPSegmentType.SYNACK || st == TCPSegmentType.FIN || st == TCPSegmentType.FINACK
+						? getAndIncrementSeqnr(1) : getSeqnr(),
 				current_acknr,
 				st, new byte[0]);
 	}
@@ -154,7 +155,7 @@ class TCPControlBlock{
 				TCPSegmentType.DATA, data);
 	}
 	
-	TCPSegment generatePreviousAck(){
-		return new TCPSegment(local_port, remote_port, previous_seqnr, current_acknr, TCPSegmentType.ACK, new byte[0]);
+	TCPSegment generateAck(TCPSegment pck){
+		return new TCPSegment(local_port, remote_port, pck.ack_nr, pck.seq_nr + (pck.data.length > 0 ? pck.data.length : 1), TCPSegmentType.ACK, new byte[0]);
 	}
 }
