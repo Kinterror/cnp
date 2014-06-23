@@ -614,6 +614,7 @@ public class TCP {
         		ack = tcb.createControlSegment(TCPSegmentType.ACK);
 				sockSend(ack);
 				break;
+        	case S_LAST_ACK:
         	case S_CLOSING:
         		ack = tcb.generatePreviousAck();
         		sockSend(ack);
