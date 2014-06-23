@@ -228,15 +228,9 @@ public class TCP {
 	        		 * received a packet with the correct sequence number
 	        		 */
 		        	if(tcb.isInOrderPacket(pck)){
-		        		
-		        		//increment acknr if received data, syn or fin packet
-		        		switch(pck.getSegmentType()){
-		        		case ACK:
-		        			break;
-			        	default:
-			        		tcb.getAndIncrementAcknr(pck.data.length);
-		        		}
-		        		outOfOrderAcknr = false;
+		        		//increment acknr
+			        	tcb.getAndIncrementAcknr(pck.data.length);
+			        	outOfOrderAcknr = false;
 		        		break;
 		        	}
 	        		/*
@@ -253,7 +247,7 @@ public class TCP {
 		        		break;
 		        	}
 		        	/* 
-		        	 * case of lost ack: we receive an old non-ack packet with the previous sequence number
+		        	 * case of lost ack: we receive an old data packet with the previous sequence number
 		        	 */
 		        	else if (pck.seq_nr == tcb.getPreviousExpectedSeqnr()){
 		        		switch(pck.getSegmentType()){

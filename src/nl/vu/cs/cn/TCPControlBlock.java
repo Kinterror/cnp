@@ -98,14 +98,10 @@ class TCPControlBlock{
 	 */
 	long getAndIncrementSeqnr(long size){
 		previous_seqnr = current_seqnr;
-		current_seqnr  += (size > 0 ? size : 1) % UINT_32_MAX;
+		current_seqnr = (current_seqnr + size) % UINT_32_MAX;
 		//this sequence number never becomes negative
 		
 		return previous_seqnr;
-	}
-	
-	void setAcknr(long acknr){
-		current_acknr = acknr;
 	}
 	
 	/**
