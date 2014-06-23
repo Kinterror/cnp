@@ -243,10 +243,11 @@ public class TCP {
 	        		 * received data packet just after having sent a data packet by yourself
 	        		 * therefore, the acknr is one too old.
 	        		 */
-		        	else if (pck.seq_nr == tcb.getSeqnr() &&
-		        			(pck.ack_nr == tcb.getPreviousExpectedSeqnr()) && 
+		        	else if (pck.seq_nr == tcb.getExpectedSeqnr() &&
+		        			(pck.ack_nr == tcb.getPreviousSeqnr()) && 
 		        			pck.getSegmentType() == TCPSegmentType.DATA){
 		        		
+		        		Log.d("sockRecv","received data packet with old acknr");
 		        		tcb.getAndIncrementAcknr(pck.data.length);
 		        		outOfOrderAcknr = true;
 		        		break;
@@ -255,22 +256,23 @@ public class TCP {
 		        	 * case of lost ack: we receive an old non-ack packet with the previous sequence number
 		        	 */
 		        	else if (pck.seq_nr == tcb.getPreviousExpectedSeqnr()){
-		        		
 		        		switch(pck.getSegmentType()){
-		        		case SYNACK:
-		        		case DATA:
-		        			//resend lost ack
-		        			TCPSegment ack = tcb.generatePreviousAck();
-	                		sockSend(ack);
-	                		continue;
 		        		case FIN:
+		        		case FINACK:
 		        		case SYN:
 		        			Log.d("sockRecv", "received retransmitted FIN/SYN.");
 		        			//now the SYNACK or FINACK was lost. Let the caller handle the lost ack now.
 		        			break;
 		        		case ACK:
 		        			Log.d("sockRecv", "received duplicate ACK, discarding it.");
-		        			continue;
+		        			if(pck.data.length <= 0)
+		        				continue;
+		        		case SYNACK:
+		        		case DATA:
+		        			//resend lost ack
+		        			TCPSegment ack = tcb.generatePreviousAck();
+	                		sockSend(ack);
+	                		continue;
 		        		default:
 		        			Log.d("sockRecv", "received invalid old packet, discarding it.");
 		        			continue;
@@ -362,7 +364,11 @@ public class TCP {
         		try {
 					TCPSegment seg = sockRecv(timeout);
 					
+					
+					
 					switch(seg.getSegmentType()){
+					case FINACK:
+						handleIncomingFin();
 					case ACK:
 						return true;
 					case DATA:
@@ -707,6 +713,8 @@ public class TCP {
 						continue;
 					}
 					switch(seg.getSegmentType()){
+					case FINACK:
+						//do all the cases
 					case ACK:
 						outOfOrderAcknr = false;
 					case DATA:	
@@ -719,7 +727,7 @@ public class TCP {
 								}
 							}
 						}
-						if(seg.getSegmentType() == TCPSegmentType.DATA){
+						if(seg.data.length > 0){
 							//put the data in the buffer and send an ack
 							handleData(seg);
 
@@ -728,7 +736,9 @@ public class TCP {
 								recv_buf.notifyAll();
 							}
 						}
-						break;
+						if(seg.getSegmentType() != TCPSegmentType.FINACK){
+							break;
+						}
 					case FIN:
 						//go to close_wait state and ack the fin
 						handleIncomingFin();

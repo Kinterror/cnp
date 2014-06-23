@@ -28,7 +28,7 @@ class TCPSegment{
 	 * all possible TCP segment types
 	 */
 	enum TCPSegmentType{
-		SYN, ACK, SYNACK, FIN, DATA, INVALID
+		SYN, ACK, SYNACK, FIN, FINACK, DATA, INVALID
 	}
 	
 	//these fields are not formally a part of the TCP header; however, in our implementation they are used. 
@@ -95,6 +95,8 @@ class TCPSegment{
 			syn = 1;
 		case DATA:
 			break;
+		case FINACK:
+			fin = 1;
 		case ACK:
 			ack = 1;
 			break;
@@ -344,6 +346,9 @@ class TCPSegment{
 		}
 		if (syn == 1 && ack == 1 && fin == 0){
 			return TCPSegmentType.SYNACK;
+		}
+		if (syn == 0 && ack == 1 && fin == 1){
+			return TCPSegmentType.FINACK;
 		}
 		return TCPSegmentType.INVALID;
 	}
