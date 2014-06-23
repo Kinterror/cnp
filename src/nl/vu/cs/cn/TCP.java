@@ -364,27 +364,29 @@ public class TCP {
         		try {
 					TCPSegment seg = sockRecv(timeout);
 					
-					
+					if(seg.data.length > 0){
+						handleData(seg);
+					}
 					
 					switch(seg.getSegmentType()){
+					case FIN:
+						handleIncomingFin();
+						break;
 					case FINACK:
 						handleIncomingFin();
 					case ACK:
 						return true;
 					case DATA:
-						handleData(seg);
+						/*
+						 * in case the ACK of the three way handshake was lost, regard the received data as an ACK and establish
+						 * the connection
+						 */
 						switch(tcb.getState()){
-						/*in case the ACK of the three way handshake was lost, regard the received data as an ACK and establish
-						* the connection
-						*/
 						case S_SYN_RCVD:
 							return true;
 						default:
 							break;
 						}
-					case FIN:
-						handleIncomingFin();
-						break;
 					case SYN:
 						return false;
 					default:
