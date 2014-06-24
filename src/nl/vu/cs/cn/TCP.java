@@ -787,7 +787,7 @@ public class TCP {
 			case S_LAST_ACK:
 				//received the other side's fin. send own fin and wait for ack.
 				TCPSegment fin = tcb.createControlSegment(TCPSegmentType.FIN);
-				sendAndWaitAck(fin);
+				sendAndWaitAckEstablished(fin);
 
 				//even if fin sending fails, close anyway
 				tcb.setState(ConnectionState.S_CLOSED);
@@ -867,7 +867,8 @@ public class TCP {
 						tcb.getState() == ConnectionState.S_FIN_WAIT_1 ||
 						tcb.getState() == ConnectionState.S_FIN_WAIT_2 ||
 						tcb.getState() == ConnectionState.S_CLOSING ||
-						tcb.getState() == ConnectionState.S_CLOSE_WAIT)
+						tcb.getState() == ConnectionState.S_CLOSE_WAIT ||
+						tcb.getState() == ConnectionState.S_LAST_ACK)
 				{ 
 					try {
 						seg = sockRecv(2000);
