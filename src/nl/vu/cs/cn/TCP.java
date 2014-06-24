@@ -66,6 +66,8 @@ public class TCP {
 		private volatile boolean closePending = false;
 		private Object waitingForAckMonitor;
 		private Object waitingForCloseMonitor;
+		private Thread recvt;
+		private Thread sendt;
 
 		/** Construct a client socket. */
 		private Socket() {
@@ -124,8 +126,11 @@ public class TCP {
 				tcb.setState(ConnectionState.S_ESTABLISHED);
 				Log.d("connect()", "Client: connection established");
 				//start sender and receiver threads
-				new Thread(new ReceiverThread()).start();
-				new Thread(new SenderThread()).start();
+				recvt = new Thread(new ReceiverThread());
+				recvt.start();
+				sendt = new Thread(new SenderThread());
+				sendt.start();
+				
 				return true;
 			} else {
 				Log.d("connect()", "failed to receive a SYN_ACK message from server");
@@ -189,8 +194,10 @@ public class TCP {
 				//try to send it
 				if (sendAndWaitAck(syn_ack)){
 					Log.d("accept()", "Server: Connection established.");
-					new Thread(new ReceiverThread()).start();
-					new Thread(new SenderThread()).start();
+					recvt = new Thread(new ReceiverThread());
+					recvt.start();
+					sendt = new Thread(new SenderThread());
+					sendt.start();
 					return;
 				}
 
@@ -650,6 +657,7 @@ public class TCP {
 				return true;
 			case S_CLOSE_WAIT:
 				tcb.setState(ConnectionState.S_LAST_ACK);
+				recvt.interrupt();
 				closePending = true;
 				synchronized (waitingForCloseMonitor) {
 					waitingForCloseMonitor.notifyAll();
