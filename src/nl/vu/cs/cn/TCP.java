@@ -827,7 +827,7 @@ public class TCP {
 							switch(tcb.getState()){
 							case S_FIN_WAIT_1:
 								tcb.setState(ConnectionState.S_FIN_WAIT_2);
-								break;
+								return;
 							default:
 							}
 							//get out of the sending loop.
