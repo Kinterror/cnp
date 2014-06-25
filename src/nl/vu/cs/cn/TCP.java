@@ -609,6 +609,11 @@ public class TCP {
 		 * @return the number of bytes written or -1 if an error occurs.
 		 */
 		public int write(byte[] buf, int offset, int len) {
+			if(closePending){
+				Log.e("write()", "can't write: socket closed");
+				return -1;
+			}
+			
 			switch(tcb.getState()){
 			case S_ESTABLISHED:
 			case S_CLOSE_WAIT:
@@ -676,7 +681,7 @@ public class TCP {
 		}
 
 		/**
-		 * send the last acknowlegdement and wait for fin to ensure the ack is received.
+		 * wait for fin to ensure the last ack is received.
 		 */
 		private void timeWait(){
 			tcb.setState(ConnectionState.S_TIME_WAIT);
@@ -778,6 +783,65 @@ public class TCP {
 		}
 
 		/**
+		 * sends the next data packet in the send buffer and waits for an ack
+		 */
+		private void sendNextDataSegment(){
+			//create a new segment from the buffer
+			byte[] temp = new byte[MAX_TCPIP_SEGMENT_SIZE];
+			int size = send_buf.deBuffer(temp, 0, MAX_TCPIP_SEGMENT_SIZE);
+
+			//copy data into smaller array to be sent
+			byte[] data = new byte[size];
+
+			for (int i = 0; i < size; i++) {
+				data[i] = temp[i];
+			}			
+			TCPSegment seg = tcb.createDataSegment(data);
+
+			//wait for the ack to be received by the receiver thread or time out.
+			if (!sendAndWaitAckEstablished(seg)) {
+				Log.e("Connection broken", "number of retries expired for ack");
+				tcb.setState(ConnectionState.S_CLOSED);
+				System.exit(0);
+			}
+		}
+		
+		/**
+		 * handles an incoming close request
+		 */
+		private void handleCloseRequest(){
+			switch(tcb.getState()){
+			case S_ESTABLISHED:	
+				tcb.setState(ConnectionState.S_FIN_WAIT_1);
+				break;
+			case S_CLOSE_WAIT:
+				tcb.setState(ConnectionState.S_LAST_ACK);
+				break;
+			default:
+				Log.d("closePending", "strange state: " + tcb.getState().name());
+				return;
+			}
+			//send fin
+			TCPSegment fin = tcb.createControlSegment(TCPSegmentType.FIN);
+
+			if (sendAndWaitAckEstablished(fin)){
+				switch(tcb.getState()){
+				case S_FIN_WAIT_1:
+					tcb.setState(ConnectionState.S_FIN_WAIT_2);
+					break;
+				case S_CLOSING:
+					timeWait();
+				case S_LAST_ACK:
+					tcb.setState(ConnectionState.S_CLOSED);
+				default:
+				}
+			} else {
+				//if we fail to receive a fin ack, force close
+				tcb.setState(ConnectionState.S_CLOSED);
+			}
+		}
+		
+		/**
 		 * Thread responsible for sending data put in the send buffer by the write() method.
 		 * Sends data packets and waits for the receiver thread to receive the corresponding acknowledgement. 
 		 */
@@ -790,60 +854,13 @@ public class TCP {
 					 * there are packets in the buffer to be sent
 					 */
 					if (!send_buf.isEmpty()){
-
-						//create a new segment from the buffer
-						byte[] temp = new byte[MAX_TCPIP_SEGMENT_SIZE];
-						int size = send_buf.deBuffer(temp, 0, MAX_TCPIP_SEGMENT_SIZE);
-
-						//copy data into smaller array to be sent
-						byte[] data = new byte[size];
-
-						for (int i = 0; i < size; i++) {
-							data[i] = temp[i];
-						}			
-						TCPSegment seg = tcb.createDataSegment(data);
-
-						//wait for the ack to be received by the receiver thread or time out.
-						if (!sendAndWaitAckEstablished(seg)) {
-							Log.e("Connection broken", "number of retries expired for ack");
-							tcb.setState(ConnectionState.S_CLOSED);
-							System.exit(0);
-						}
+						sendNextDataSegment();
 					}
 					/*
 					 * There are no more packets to be sent and the connection is to be closed. Send a FIN packet.
 					 */
-					else if (closePending && 
-						(tcb.getState() == ConnectionState.S_ESTABLISHED || tcb.getState() == ConnectionState.S_CLOSE_WAIT))
-					{
-						switch(tcb.getState()){
-						case S_ESTABLISHED:	
-							tcb.setState(ConnectionState.S_FIN_WAIT_1);
-							break;
-						case S_CLOSE_WAIT:
-							tcb.setState(ConnectionState.S_LAST_ACK);
-							break;
-						default:
-							Log.d("closePending", "strange state: " + tcb.getState().name());
-						}
-						//send fin
-						TCPSegment fin = tcb.createControlSegment(TCPSegmentType.FIN);
-
-						if (sendAndWaitAckEstablished(fin)){
-							switch(tcb.getState()){
-							case S_FIN_WAIT_1:
-								tcb.setState(ConnectionState.S_FIN_WAIT_2);
-								break;
-							case S_CLOSING:
-								timeWait();
-							default:
-							}
-							//get out of the sending loop.
-							break;
-						}
-						//if we fail to receive a fin ack, force close
-						tcb.setState(ConnectionState.S_CLOSED);
-						return;
+					else if (closePending) {
+						handleCloseRequest();
 					}
 					/*
 					 * There are currently no packets to be sent, so wait until more packets come in from the application.
@@ -867,13 +884,11 @@ public class TCP {
 		private class ReceiverThread implements Runnable {
 
 			public void run() {
-				TCPSegment seg;
-
 				while (tcb.getState() != ConnectionState.S_CLOSED)
 				{ 
 					try {
 						//just receive packets and handle them accordingly
-						seg = sockRecv(10);
+						TCPSegment seg = sockRecv(10);
 						handlePacket(seg);
 					} catch (InterruptedException e) {
 						//continue
