@@ -251,8 +251,6 @@ public class TCPWithPacketLoss {
 			 * received a packet with the correct sequence number
 			 */
 			if(tcb.isInOrderPacket(seg)){
-				//increment acknr
-				
 				handleInOrderPacket(seg);
 			}
 			
@@ -263,7 +261,7 @@ public class TCPWithPacketLoss {
 			else if (seg.seq_nr == tcb.getExpectedSeqnr() &&
 					seg.ack_nr == tcb.getPreviousSeqnr())
 			{
-				Log.d("sockRecv","received data packet with old acknr");
+				Log.d("handlePacket","received packet with old acknr");
 				handlePreviousAcknr(seg);
 			}
 
@@ -272,7 +270,7 @@ public class TCPWithPacketLoss {
 			 */
 			else if (seg.seq_nr == tcb.getPreviousExpectedSeqnr() && 
 					(seg.ack_nr == tcb.getSeqnr() || seg.ack_nr == tcb.getPreviousSeqnr())){
-				Log.d("sockRecv","received data packet with old seqnr");
+				Log.d("handlePacket","received packet with old seqnr");
 				handlePreviousSeqnr(seg);
 			}
 			
@@ -281,7 +279,7 @@ public class TCPWithPacketLoss {
 			 */
 			else {
 				//discard the packet and log it
-				Log.d("sockRecv", "received incorrect (out of order) packet with sequence number " + seg.seq_nr + 
+				Log.d("handlePacket", "received incorrect (out of order) packet with sequence number " + seg.seq_nr + 
 						" and acknowledgement number " + seg.ack_nr + ". Expected seqnr: "+ tcb.getExpectedSeqnr() +
 						" or prev:" + tcb.getPreviousExpectedSeqnr()+ ", acknr" + tcb.getSeqnr());
 			}

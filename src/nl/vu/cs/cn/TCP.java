@@ -58,15 +58,16 @@ public class TCP {
 		private volatile BoundedByteBuffer recv_buf;
 		private volatile BoundedByteBuffer send_buf;
 
-		private volatile boolean isWaitingForAck = false;
-		private volatile boolean closePending = false;
+		private volatile boolean isWaitingForAck;
+		private volatile boolean closePending;
 		private Object waitingForAckMonitor;
-		private Object waitingForCloseMonitor;
 
 		/** Construct a client socket. */
 		private Socket() {
 			this(DEFAULT_CLIENT_PORT);
 			isClientSocket = true;
+			closePending = false;
+			isWaitingForAck = false;
 		}
 
 		/**
@@ -76,7 +77,6 @@ public class TCP {
 		private Socket(int port) {
 			isClientSocket = false;
 			waitingForAckMonitor = new Object();
-			waitingForCloseMonitor = new Object();
 			tcb = new TCPControlBlock();
 			tcb.setLocalSocketAddress(new SocketAddress(ip.getLocalAddress(), port));
 
@@ -249,7 +249,7 @@ public class TCP {
 			else if (seg.seq_nr == tcb.getExpectedSeqnr() &&
 					seg.ack_nr == tcb.getPreviousSeqnr())
 			{
-				Log.d("sockRecv","received data packet with old acknr");
+				Log.d("handlePacket","received packet with old acknr");
 				handlePreviousAcknr(seg);
 			}
 
@@ -258,7 +258,7 @@ public class TCP {
 			 */
 			else if (seg.seq_nr == tcb.getPreviousExpectedSeqnr() && 
 					(seg.ack_nr == tcb.getSeqnr() || seg.ack_nr == tcb.getPreviousSeqnr())){
-				Log.d("sockRecv","received data packet with old seqnr");
+				Log.d("handlePacket","received packet with old seqnr");
 				handlePreviousSeqnr(seg);
 			}
 			
@@ -267,7 +267,7 @@ public class TCP {
 			 */
 			else {
 				//discard the packet and log it
-				Log.d("sockRecv", "received incorrect (out of order) packet with sequence number " + seg.seq_nr + 
+				Log.d("handlePacket", "received incorrect (out of order) packet with sequence number " + seg.seq_nr + 
 						" and acknowledgement number " + seg.ack_nr + ". Expected seqnr: "+ tcb.getExpectedSeqnr() +
 						" or prev:" + tcb.getPreviousExpectedSeqnr()+ ", acknr" + tcb.getSeqnr());
 			}
@@ -666,15 +666,8 @@ public class TCP {
 		public boolean close() {
 			switch(tcb.getState()){
 			case S_ESTABLISHED:
-				tcb.setState(ConnectionState.S_FIN_WAIT_1);
-				closePending = true;
-				return true;
 			case S_CLOSE_WAIT:
-				tcb.setState(ConnectionState.S_LAST_ACK);
 				closePending = true;
-				synchronized (waitingForCloseMonitor) {
-					waitingForCloseMonitor.notifyAll();
-				}
 				return true;
 			default:
 				Log.e("close() error", "can't close a non-open socket");
@@ -686,9 +679,6 @@ public class TCP {
 		 * send the last acknowlegdement and wait for fin to ensure the ack is received.
 		 */
 		private void timeWait(){
-			TCPSegment ack = tcb.createControlSegment(TCPSegmentType.ACK);
-			sockSend(ack);
-
 			tcb.setState(ConnectionState.S_TIME_WAIT);
 
 			//start timed receive for 10 seconds
@@ -702,7 +692,7 @@ public class TCP {
 					TCPSegment segment = sockRecv(timer);
 					if(segment.getSegmentType() == TCPSegmentType.FIN){
 						//send ack again
-						ack = tcb.generateAck(segment);
+						TCPSegment ack = tcb.generateAck(segment);
 						sockSend(ack);
 					}
 				} catch (InterruptedException e) {
@@ -750,7 +740,7 @@ public class TCP {
 		 * possibly including terminating the connection.
 		 */
 		private void handleIncomingFin(TCPSegment seg){
-			TCPSegment ack;
+			TCPSegment ack = tcb.generateAck(seg);
 
 			/*
 			 * if we were in established state, go to close_wait state and send an ack.
@@ -776,6 +766,7 @@ public class TCP {
 			case S_FIN_WAIT_2:
 				//our side closed first
 				tcb.getAndIncrementAcknr(1);
+				sockSend(ack);
 				timeWait();
 				return;
 			default:
@@ -783,46 +774,7 @@ public class TCP {
 				return;
 			}
 			//send ack
-			ack = tcb.generateAck(seg);
 			sockSend(ack);
-		}
-
-		/**
-		 * This method is called once the sender thread is not allowed to send data anymore.
-		 * We wait until the connection is closed properly and make some steps in the connection termination procedure.
-		 */
-		private void waitForClose() {
-			//wait for the application to close the connection
-			Log.d("waitForClose()", "Beginning of the method for the sender thread. closePending="+closePending);
-			while (!closePending){
-				synchronized(waitingForCloseMonitor){
-					try {
-						waitingForCloseMonitor.wait(1000);
-					} catch (InterruptedException e) {
-						e.printStackTrace();
-					}
-				}
-			}
-			Log.d("waitForClose", "Exited the while, closePending = "+closePending);
-			//if the app closed the connection:
-			switch(tcb.getState()){
-			case S_LAST_ACK:
-				Log.d("waitForClose", "case S_LAST_ACK");
-				//received the other side's fin. send own fin and wait for ack.
-				TCPSegment fin = tcb.createControlSegment(TCPSegmentType.FIN);
-				sendAndWaitAckEstablished(fin);
-
-				//even if fin sending fails, close anyway
-				tcb.setState(ConnectionState.S_CLOSED);
-				break;
-			case S_CLOSING:
-				Log.d("waitForClose", "case S_CLOSING");
-				timeWait();
-				break;
-			default:
-				Log.d("waitForClose", "case default");
-				tcb.setState(ConnectionState.S_CLOSED);
-			}
 		}
 
 		/**
@@ -831,10 +783,9 @@ public class TCP {
 		 */
 		private class SenderThread implements Runnable {
 			public void run() {
-				//only send packets if the connections hasn't been closed yet
+				//only send packets if the connections hasn't been closed yet by the application
 				while(tcb.getState() == ConnectionState.S_ESTABLISHED || 
-						tcb.getState() == ConnectionState.S_CLOSE_WAIT ||
-						tcb.getState() == ConnectionState.S_FIN_WAIT_1){
+						tcb.getState() == ConnectionState.S_CLOSE_WAIT){
 					/*
 					 * there are packets in the buffer to be sent
 					 */
@@ -858,10 +809,23 @@ public class TCP {
 							tcb.setState(ConnectionState.S_CLOSED);
 							System.exit(0);
 						}
+					}
 					/*
 					 * There are no more packets to be sent and the connection is to be closed. Send a FIN packet.
 					 */
-					} else if (closePending && tcb.getState() == ConnectionState.S_FIN_WAIT_1){
+					else if (closePending && 
+						(tcb.getState() == ConnectionState.S_ESTABLISHED || tcb.getState() == ConnectionState.S_CLOSE_WAIT))
+					{
+						switch(tcb.getState()){
+						case S_ESTABLISHED:	
+							tcb.setState(ConnectionState.S_FIN_WAIT_1);
+							break;
+						case S_CLOSE_WAIT:
+							tcb.setState(ConnectionState.S_LAST_ACK);
+							break;
+						default:
+							Log.d("closePending", "strange state: " + tcb.getState().name());
+						}
 						//send fin
 						TCPSegment fin = tcb.createControlSegment(TCPSegmentType.FIN);
 
@@ -869,7 +833,9 @@ public class TCP {
 							switch(tcb.getState()){
 							case S_FIN_WAIT_1:
 								tcb.setState(ConnectionState.S_FIN_WAIT_2);
-								return;
+								break;
+							case S_CLOSING:
+								timeWait();
 							default:
 							}
 							//get out of the sending loop.
@@ -878,10 +844,11 @@ public class TCP {
 						//if we fail to receive a fin ack, force close
 						tcb.setState(ConnectionState.S_CLOSED);
 						return;
+					}
 					/*
 					 * There are currently no packets to be sent, so wait until more packets come in from the application.
 					 */
-					} else {
+					else {
 						//no packet due
 						try {
 							synchronized (send_buf) {
@@ -890,10 +857,7 @@ public class TCP {
 						} catch (InterruptedException e) { e.printStackTrace(); }
 					}
 				}
-				
-				//exited the main loop, wait for the connection to be closed or close it yourself
-				Log.d("Sender Thread", "Exited the while loop, go to waitForClose()");
-				waitForClose();
+				//sender thread is finished here
 			}
 		}
 
@@ -905,12 +869,7 @@ public class TCP {
 			public void run() {
 				TCPSegment seg;
 
-				while (tcb.getState() == ConnectionState.S_ESTABLISHED || 
-						tcb.getState() == ConnectionState.S_FIN_WAIT_1 ||
-						tcb.getState() == ConnectionState.S_FIN_WAIT_2 ||
-						tcb.getState() == ConnectionState.S_CLOSING ||
-						tcb.getState() == ConnectionState.S_CLOSE_WAIT ||
-						tcb.getState() == ConnectionState.S_LAST_ACK)
+				while (tcb.getState() != ConnectionState.S_CLOSED)
 				{ 
 					try {
 						//just receive packets and handle them accordingly
