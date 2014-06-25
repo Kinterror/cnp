@@ -30,12 +30,19 @@ class TCPControlBlock{
 	private long previous_seqnr;
 	private long current_acknr;
 	private long previous_acknr;
+	
+	/**
+	 * indicates a connection has been made on this socket. Set to false before the connection was established the first time.
+	 * Set to true after some connection has been established on the socket
+	 */
+	boolean hasConnection;
 
 	TCPControlBlock(){
 		state = ConnectionState.S_CLOSED;
 		current_seqnr = current_acknr = previous_acknr = previous_seqnr = 0;
 		local_port = 0;
 		remote_port = 0;
+		hasConnection = false;
 
 		rand = new Random();
 	}
@@ -55,6 +62,10 @@ class TCPControlBlock{
 	}
 		
 	void setState(ConnectionState s){
+		if (s == ConnectionState.S_ESTABLISHED){
+			hasConnection = true;
+		}
+		
 		Log.d("TCB", "state set to: " + s.name());
 		this.state = s;
 	}
