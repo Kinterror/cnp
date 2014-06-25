@@ -59,7 +59,7 @@ public class TCP {
 		private volatile BoundedByteBuffer send_buf;
 
 		/**
-		 * used to indicate the data arrived has a previous acknowledgement number; thus, both sides of the connection called
+		 * used to indicate the data arrived has a previous acknowledgment number; thus, both sides of the connection called
 		 * send() at the same time 
 		 */
 		private volatile boolean isWaitingForAck = false;
@@ -244,6 +244,7 @@ public class TCP {
 			 */
 			if(tcb.isInOrderPacket(seg)){
 				//increment acknr
+				
 				handleInOrderPacket(seg);
 			}
 			/*
@@ -262,6 +263,7 @@ public class TCP {
 			 */
 			else if (seg.seq_nr == tcb.getPreviousExpectedSeqnr() && 
 					(seg.ack_nr == tcb.getSeqnr() || seg.ack_nr == tcb.getPreviousSeqnr())){
+				Log.d("sockRecv","received data packet with old seqnr");
 				handleOldSeqnr(seg);
 			}
 			/*
@@ -324,6 +326,7 @@ public class TCP {
 				synchronized(waitingForAckMonitor){
 					if (isWaitingForAck){
 						isWaitingForAck = false;
+						Log.d("handleInOrderPAcket", "Notifying thread waiting for ack");
 						waitingForAckMonitor.notify();
 					}
 				}
@@ -403,13 +406,16 @@ public class TCP {
 
 				//wait for ack
 				boolean hasReceived = false;
-
+				Log.d("sendAndWaitAck()", "packet has type: "+pck.getSegmentType().toString());
 				switch(pck.getSegmentType()){
 				case SYN:
 					hasReceived = waitForSynAck();
 					break;
 				case SYNACK:
 					hasReceived = waitForAckToSynAck();
+					break;
+				case FIN:
+					hasReceived = waitForAckToFin();
 					break;
 				default:
 					return false;
@@ -426,43 +432,43 @@ public class TCP {
 		 * @return false if we received nothing.
 		 * @return true if we received an ack.
 		 */
-//		private boolean waitForAckToFin(){
-//			if(tcb.getState() != ConnectionState.S_LAST_ACK)
-//				return false;
-//
-//			while(true){
-//				try {
-//					TCPSegment seg = sockRecv(timeout);
-//
-//					//wrong sequence numbers
-//					if(!tcb.isInOrderPacket(seg)){
-//
-//						/* ack got lost
-//						 */
-//						if(seg.getSegmentType() == TCPSegmentType.FIN){
-//							//resend lost ack
-//							sockSend(tcb.generateAck(seg));
-//						} else {
-//							Log.d("waitForAckToFin", "received out of order non-fin packet in S_LAST_ACK");
-//						}
-//						continue;
-//					}
-//					//right sequence numbers
-//					else {
-//						switch(seg.getSegmentType()){
-//						case FINACK:
-//							handleIncomingFin(seg);
-//						case ACK:
-//							return true;
-//						default:
-//							//discard it
-//						}
-//					}
-//				} catch (InterruptedException e) {
-//					return false;
-//				}
-//			}
-//		}
+		private boolean waitForAckToFin(){
+			if(tcb.getState() != ConnectionState.S_LAST_ACK)
+				return false;
+
+			while(true){
+				try {
+					TCPSegment seg = sockRecv(timeout);
+
+					//wrong sequence numbers
+					if(!tcb.isInOrderPacket(seg)){
+
+						/* ack got lost
+						 */
+						if(seg.getSegmentType() == TCPSegmentType.FIN){
+							//resend lost ack
+							sockSend(tcb.generateAck(seg));
+						} else {
+							Log.d("waitForAckToFin", "received out of order non-fin packet in S_LAST_ACK");
+						}
+						continue;
+					}
+					//right sequence numbers
+					else {
+						switch(seg.getSegmentType()){
+						case FINACK:
+							handleIncomingFin(seg);
+						case ACK:
+							return true;
+						default:
+							//discard it
+						}
+					}
+				} catch (InterruptedException e) {
+					return false;
+				}
+			}
+		}
 
 		/**
 		 * method that waits for an acknowledgement for a sent syn,ack. This is only called in the S_SYN_RCVD state.
@@ -654,6 +660,7 @@ public class TCP {
 				return true;
 			case S_CLOSE_WAIT:
 				tcb.setState(ConnectionState.S_LAST_ACK);
+				recvt.interrupt();
 				closePending = true;
 				synchronized (waitingForCloseMonitor) {
 					waitingForCloseMonitor.notifyAll();
@@ -768,6 +775,7 @@ public class TCP {
 
 		private void waitForClose() {
 			//wait for the application to close the connection
+			Log.d("waitForClose()", "Beginning of the method for the sender thread. closePending="+closePending);
 			while (!closePending){
 				synchronized(waitingForCloseMonitor){
 					try {
@@ -777,29 +785,31 @@ public class TCP {
 					}
 				}
 			}
-
+			Log.d("waitForClose", "Exited the while, closePending = "+closePending);
 			//if the app closed the connection:
 			switch(tcb.getState()){
 			case S_LAST_ACK:
+				Log.d("waitForClose", "case S_LAST_ACK");
 				//received the other side's fin. send own fin and wait for ack.
 				TCPSegment fin = tcb.createControlSegment(TCPSegmentType.FIN);
-				Log.d("waitForClose", "sending fin and waiting for ack in LAST_ACK");
 				sendAndWaitAckEstablished(fin);
 
 				//even if fin sending fails, close anyway
 				tcb.setState(ConnectionState.S_CLOSED);
 				break;
 			case S_CLOSING:
+				Log.d("waitForClose", "case S_CLOSING");
 				gotoTimeWait();
 				break;
 			default:
+				Log.d("waitForClose", "case default");
 				tcb.setState(ConnectionState.S_CLOSED);
 			}
 		}
 
 		private class SenderThread implements Runnable {
 			public void run() {
-				//only send packets it the connections hasn't been closed yet
+				//only send packets if the connections hasn't been closed yet
 				while(tcb.getState() == ConnectionState.S_ESTABLISHED || 
 						tcb.getState() == ConnectionState.S_CLOSE_WAIT ||
 						tcb.getState() == ConnectionState.S_FIN_WAIT_1){
@@ -850,6 +860,7 @@ public class TCP {
 						} catch (InterruptedException e) { e.printStackTrace(); }
 					}
 				}
+				Log.d("Sender Thread", "Exited the while loop, go to waitForClose()");
 				//exited the main loop, do closing
 				waitForClose();
 			}
@@ -868,7 +879,7 @@ public class TCP {
 						tcb.getState() == ConnectionState.S_LAST_ACK)
 				{ 
 					try {
-						seg = sockRecv(2000);
+						seg = sockRecv(10);
 						handlePacket(seg);
 					} catch (InterruptedException e) {
 						//continue
