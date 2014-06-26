@@ -899,7 +899,7 @@ public class TCPWithPacketLoss {
 	}
 
 	/**
-	 * @return a new socket for this stack
+	 * @return a new client socket for this stack.
 	 */
 	public Socket socket() {
 		return new Socket();
@@ -915,7 +915,7 @@ public class TCPWithPacketLoss {
 	}
 
 	/**
-	 * @return a new server socket for this stack bound to the given port
+	 * @return a new server socket for this stack bound to the given port.
 	 * @param port the port to bind the socket to.
 	 */
 	public Socket socket(int port) {
@@ -931,7 +931,7 @@ public class TCPWithPacketLoss {
 	 * @param the TCP packet to be sent
 	 * @throws IOException if the sending failed
 	 */
-	void send_tcp_segment(IpAddress destination, TCPSegment p) throws IOException{
+	public void send_tcp_segment(IpAddress destination, TCPSegment p) throws IOException{
 		//get integer value of IPAddress
 		int destIpInt = destination.getAddress();
 
@@ -981,7 +981,7 @@ public class TCPWithPacketLoss {
 	 * @throws InterruptedException if the timeout expired
 	 * @throws InvalidPacketException if the packet is corrupted or has incorrect content
 	 */
-	TCPSegment recv_tcp_segment(int timeout) throws InvalidPacketException, InterruptedException{
+	public TCPSegment recv_tcp_segment(int timeout) throws InvalidPacketException, InterruptedException{
 		Packet ip_packet = new Packet();
 		try {
 			if(timeout > 0){

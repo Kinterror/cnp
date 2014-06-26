@@ -871,7 +871,7 @@ public class TCP {
 	}
 
 	/**
-	 * @return a new socket for this stack
+	 * @return a new client socket for this stack.
 	 */
 	public Socket socket() {
 		return new Socket();
@@ -887,7 +887,7 @@ public class TCP {
 	}
 
 	/**
-	 * @return a new server socket for this stack bound to the given port
+	 * @return a new server socket for this stack bound to the given port.
 	 * @param port the port to bind the socket to.
 	 */
 	public Socket socket(int port) {
