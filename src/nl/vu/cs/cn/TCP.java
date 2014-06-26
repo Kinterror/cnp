@@ -23,11 +23,14 @@ public class TCP {
 	/**maximum number of tries waiting for an ack*/
 	public static final int MAX_TRIES = 10;
 
-	/**the length of TCP headers used by our implementation. Options are not supported.*/
+	/**the length of IP headers used by our implementation. Options are not supported.*/
 	public static final int IP_HEADER_LENGTH = 20;
 
 	/**the maximum size (bytes) of any packet sent through the ip layer*/
 	public static final int MAX_TCPIP_SEGMENT_SIZE = 8192;
+	
+	/**maximum data length*/
+	public static final int MAX_DATA_LENGTH = MAX_TCPIP_SEGMENT_SIZE - IP_HEADER_LENGTH - TCPSegment.HEADER_LENGTH;
 
 	/** Size of the send and receive buffer */
 	public static final int BUFFER_SIZE = 1048576; // 1MB
@@ -574,9 +577,7 @@ public class TCP {
 			switch(tcb.getState()){
 			case S_ESTABLISHED:
 			case S_CLOSE_WAIT:
-				//maximum data length
-				int max_data_len = MAX_TCPIP_SEGMENT_SIZE - IP_HEADER_LENGTH - TCPSegment.HEADER_LENGTH;
-
+				
 				//maybe the buffer is not long enough
 				if((buf.length - offset) < len){
 					len = buf.length - offset;
@@ -587,10 +588,10 @@ public class TCP {
 				//while there are still bytes to write, split data into processable sizes and buffer them.
 				while(len > 0){
 					byte[] data;
-					if(len >= max_data_len){
+					if(len >= MAX_DATA_LENGTH){
 						//send a packet of max size
-						data = new byte[max_data_len];
-						len -= max_data_len;
+						data = new byte[MAX_DATA_LENGTH];
+						len -= MAX_DATA_LENGTH;
 					} else {
 						data = new byte[len];
 						len = 0;
@@ -744,8 +745,8 @@ public class TCP {
 		 */
 		private void sendNextDataSegment(){
 			//create a new segment from the buffer
-			byte[] temp = new byte[MAX_TCPIP_SEGMENT_SIZE];
-			int size = send_buf.deBuffer(temp, 0, MAX_TCPIP_SEGMENT_SIZE);
+			byte[] temp = new byte[MAX_DATA_LENGTH];
+			int size = send_buf.deBuffer(temp, 0, MAX_DATA_LENGTH);
 
 			//copy data into smaller array to be sent
 			byte[] data = new byte[size];
