@@ -16,10 +16,12 @@ import android.widget.TextView;
 
 public class Chat extends Activity{
 
+	//The views of the application
 	Button btnTop, btnBottom;
 	TextView tvTop, tvBottom;
 	EditText etTop, etBottom;
-	int maxlen = 50;
+	
+	int maxlen = 50;	//max length of a message
 
 	//Server's variables
 	Thread serverThread;
@@ -38,29 +40,30 @@ public class Chat extends Activity{
 
 
 	/**
-	 * 
+	 * Initialization of the views. Handle the user's actions when he presses the Send button.
+	 * The server will be the upper part and the client will be the bottom part of the application.
 	 */
 	protected void initVariables(){
 
-		//The graphical items of the server
+		// The graphical items of the server
 		btnTop = (Button)findViewById(R.id.btnTop);
 		tvTop = (TextView)findViewById(R.id.tvTop);
 		tvTop.setMovementMethod(new ScrollingMovementMethod());
 
 		etTop = (EditText)findViewById(R.id.etTop);
+		// What happens when the user clicks on Send
 		btnTop.setOnClickListener(new OnClickListener() {
 
 			public void onClick(View v) {
-				//retrieving the message the user wrote
+				// Retrieving the message the user wrote
 				String message = etTop.getText().toString();
 				Log.d("server onCick()", "message in the EditText view: "+message);
+				// Convert the string into a byte array 
 				byte[] tmp = message.getBytes();
+				// Send the message
 				serverSocket.write(tmp, 0, tmp.length);
-				//clear the EditText view
+				// Clear the EditText view
 				etTop.setText("");
-				
-				
-
 			}
 		});
 		
@@ -69,24 +72,27 @@ public class Chat extends Activity{
 		tvBottom = (TextView)findViewById(R.id.tvBottom);
 		tvBottom.setMovementMethod(new ScrollingMovementMethod());
 		etBottom = (EditText)findViewById(R.id.etBottom);
+		//What happens when the user clicks on Send
 		btnBottom.setOnClickListener(new OnClickListener() {
 
 			public void onClick(View v) {
-				//retrieving the message the user wrote
+				//Retrieving the message the user wrote
 				String message = etBottom.getText().toString();
 				Log.d("client onCick()", "message in the EditText view: "+message);
+				// Convert the string into a byte array 
 				byte[] tmp = message.getBytes();
+				// Send the message
 				clientSocket.write(tmp, 0, tmp.length);
-				//clear the EditText view
+				// Clear the EditText view
 				etBottom.setText("");
 			}
 		});
-
 	}
 
 
 	/**
-	 * 
+	 * When the application starts. Sets the layout and call initVariables() to initialize the views.
+	 * Starts the server and client threads.
 	 */
 	protected void onCreate(Bundle savedInstanceState) {
 
@@ -99,26 +105,12 @@ public class Chat extends Activity{
 			public void run() {
 				Log.d("serverThread's run()","serverThread creates a new TCP stack with the address 192.168.0."+serverIP);
 				try {
-					serverStack = new TCP(serverIP);
-					serverSocket = serverStack.socket(serverPort);
+					serverStack = new TCP(serverIP);		// Creating a new TCP stack
+					serverSocket = serverStack.socket(serverPort);		// Setting the socket to the right port
 					Log.d("serverThread's run()", "Server starts to accept");
-					serverSocket.accept();
-					int n;
-					while((n = serverSocket.read(serverBuf, 0, maxlen)) > 0){
-						final String messageReceived = new String(serverBuf, 0, n);
-						Log.d("serverThread's run()", "Received message: "+messageReceived);
-						runOnUiThread(new Runnable() {
-							public void run() {
-								tvTop.append(messageReceived+"\n");
-								final int scrollAmount = tvTop.getLayout().getLineTop(tvTop.getLineCount()) - tvTop.getHeight();
-							    // if there is no need to scroll, scrollAmount will be <=0
-							    if (scrollAmount > 0)
-							    	tvTop.scrollTo(0, scrollAmount);
-							    else
-							    	tvTop.scrollTo(0, 0);
-							}
-						});
-					}
+					serverSocket.accept();			// Starts listening for incoming connection
+					handlingMessages(serverSocket, serverBuf, tvTop);
+
 				} catch (IOException e) {
 					e.printStackTrace();
 				}
@@ -137,22 +129,8 @@ public class Chat extends Activity{
 						Log.e("clientThread","Unable to connect");
 						return;
 					}
-					int m;
-					while((m = clientSocket.read(clientBuf, 0, maxlen)) > 0){
-						final String messageReceived = new String(clientBuf, 0, m);
-						Log.d("clientThread's run()", "Received message: "+messageReceived);
-						runOnUiThread(new Runnable() {
-							public void run() {
-								tvBottom.append(messageReceived+"\n");
-								final int scrollAmount = tvBottom.getLayout().getLineTop(tvBottom.getLineCount()) - tvBottom.getHeight();
-							    // if there is no need to scroll, scrollAmount will be <=0
-							    if (scrollAmount > 0)
-							    	tvBottom.scrollTo(0, scrollAmount);
-							    else
-							    	tvBottom.scrollTo(0, 0);
-							}
-						});
-					}
+					handlingMessages(clientSocket, clientBuf, tvBottom);
+
 				} catch (IOException e) {
 					e.printStackTrace();
 				}
@@ -166,12 +144,35 @@ public class Chat extends Activity{
 
 	}
 
-	protected void onClose() {
-
+	private void handlingMessages(Socket soc, byte[] buf, final TextView tv){
+		int n;
+		// if it receives a message, converts it into a string and display in the TextView
+		while((n = soc.read(buf, 0, maxlen)) > 0){
+			final String messageReceived = new String(buf, 0, n);
+			Log.d("Thread ", "Received message: "+messageReceived);
+			// To be able to modify the TextView. Only the thread which created a view can modify it.
+			// Here the main thread created tvTop, so we do that to allow serverThread to change it.
+			runOnUiThread(new Runnable() {
+				public void run() {
+					tv.append(messageReceived+"\n");
+					// find the amount we need to scroll. This works by
+				    // asking the TextView's internal layout for the position
+				    // of the final line and then subtracting the TextView's height
+					final int scrollAmount = tv.getLayout().getLineTop(tv.getLineCount())-
+							tv.getHeight();
+				    // if there is no need to scroll, scrollAmount will be <=0
+				    if (scrollAmount > 0)
+				    	tv.scrollTo(0, scrollAmount);
+				    else
+				    	tv.scrollTo(0, 0);
+				}
+			});
+		}
 	}
-
+	
+	
 	/**
-	 * 
+	 * When the user press return to exit the application, close the connection and clean.
 	 */
 	protected  void onPause() {
 		super.onPause();
