@@ -416,9 +416,9 @@ public class TCP {
 				case SYNACK:
 					hasReceived = waitForAckToSynAck();
 					break;
-				case FIN:
-					hasReceived = waitForAckToFin();
-					break;
+//				case FIN:
+//					hasReceived = waitForAckToFin();
+//					break;
 				default:
 					return false;
 				}
@@ -427,49 +427,6 @@ public class TCP {
 				}
 			}
 			return false;
-		}
-
-		/**
-		 * method that waits for an acknowledgement for a sent fin. This is only called in the S_LAST_ACK state
-		 * @return false if we received nothing.
-		 * @return true if we received an ack.
-		 */
-		private boolean waitForAckToFin(){
-			if(tcb.getState() != ConnectionState.S_LAST_ACK)
-				return false;
-
-			while(true){
-				try {
-					TCPSegment seg = sockRecv(timeout);
-
-					//wrong sequence numbers
-					if(!tcb.isInOrderPacket(seg)){
-
-						/* ack got lost
-						 */
-						if(seg.getSegmentType() == TCPSegmentType.FIN){
-							//resend lost ack
-							sockSend(tcb.generateAck(seg));
-						} else {
-							Log.d("waitForAckToFin", "received out of order non-fin packet in S_LAST_ACK");
-						}
-						continue;
-					}
-					//right sequence numbers
-					else {
-						switch(seg.getSegmentType()){
-						case FINACK:
-							handleIncomingFin(seg);
-						case ACK:
-							return true;
-						default:
-							//discard it
-						}
-					}
-				} catch (InterruptedException e) {
-					return false;
-				}
-			}
 		}
 
 		/**
@@ -888,7 +845,7 @@ public class TCP {
 				{ 
 					try {
 						//just receive packets and handle them accordingly
-						TCPSegment seg = sockRecv(10);
+						TCPSegment seg = sockRecv(100);
 						handlePacket(seg);
 					} catch (InterruptedException e) {
 						//continue
