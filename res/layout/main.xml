@@ -15,7 +15,7 @@
             android:id="@+id/tvTop"
             android:layout_width="match_parent"
             android:layout_height="158dp"
-            android:text="@string/incmsg" />
+            android:hint="@string/incmsg" />
 
         <LinearLayout
             android:layout_width="fill_parent"
@@ -29,7 +29,8 @@
                 android:layout_width="wrap_content"
                 android:layout_height="match_parent"
                 android:layout_weight="4"
-                android:ems="10" />
+                android:ems="10" 
+            	android:hint="@string/enter_message" />
 
             <Button
                 android:id="@+id/btnTop"
@@ -50,7 +51,7 @@
             android:id="@+id/tvBottom"
             android:layout_width="match_parent"
             android:layout_height="158dp"
-            android:text="@string/incmsg" />
+            android:hint="@string/incmsg" />
 
         <LinearLayout
             android:layout_width="fill_parent"
@@ -64,7 +65,8 @@
                 android:layout_width="wrap_content"
                 android:layout_height="match_parent"
                 android:layout_weight="4"
-                android:ems="10" />
+                android:ems="10" 
+                android:hint="@string/enter_message" />
 
             <Button
                 android:id="@+id/btnBottom"

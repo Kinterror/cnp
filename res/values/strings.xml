@@ -4,5 +4,6 @@
     <string name="app_name">CNPracticum Chat</string>
     <string name="incmsg">Incoming messages&#8230;</string>
     <string name="send">Send</string>
+    <string name="enter_message">Enter a message&#8230;</string>
     
 </resources>
