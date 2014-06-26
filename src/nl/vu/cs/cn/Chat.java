@@ -48,20 +48,25 @@ public class Chat extends Activity{
 		// The graphical items of the server
 		btnTop = (Button)findViewById(R.id.btnTop);
 		tvTop = (TextView)findViewById(R.id.tvTop);
-		tvTop.setMovementMethod(new ScrollingMovementMethod());
+		tvTop.setMovementMethod(new ScrollingMovementMethod()); 	// Allow to scroll through the messages if too many
 
 		etTop = (EditText)findViewById(R.id.etTop);
+		
 		// What happens when the user clicks on Send
 		btnTop.setOnClickListener(new OnClickListener() {
 
 			public void onClick(View v) {
+				
 				// Retrieving the message the user wrote
 				String message = etTop.getText().toString();
 				Log.d("server onCick()", "message in the EditText view: "+message);
+				
 				// Convert the string into a byte array 
 				byte[] tmp = message.getBytes();
+				
 				// Send the message
 				serverSocket.write(tmp, 0, tmp.length);
+				
 				// Clear the EditText view
 				etTop.setText("");
 			}
@@ -70,19 +75,25 @@ public class Chat extends Activity{
 		//The graphical items of the client
 		btnBottom = (Button)findViewById(R.id.btnBottom);
 		tvBottom = (TextView)findViewById(R.id.tvBottom);
-		tvBottom.setMovementMethod(new ScrollingMovementMethod());
+		tvBottom.setMovementMethod(new ScrollingMovementMethod());	// Allow to scroll through the messages if too many
+		
 		etBottom = (EditText)findViewById(R.id.etBottom);
+		
 		//What happens when the user clicks on Send
 		btnBottom.setOnClickListener(new OnClickListener() {
 
 			public void onClick(View v) {
+				
 				//Retrieving the message the user wrote
 				String message = etBottom.getText().toString();
 				Log.d("client onCick()", "message in the EditText view: "+message);
+				
 				// Convert the string into a byte array 
 				byte[] tmp = message.getBytes();
+				
 				// Send the message
 				clientSocket.write(tmp, 0, tmp.length);
+				
 				// Clear the EditText view
 				etBottom.setText("");
 			}
@@ -98,8 +109,9 @@ public class Chat extends Activity{
 
 		super.onCreate(savedInstanceState);
 		setContentView(R.layout.main);
-		initVariables();
+		initVariables();		// Initialize the views objects
 
+		// Initialize the server and client threads
 		serverThread = new Thread(new Runnable() {
 
 			public void run() {
@@ -109,7 +121,9 @@ public class Chat extends Activity{
 					serverSocket = serverStack.socket(serverPort);		// Setting the socket to the right port
 					Log.d("serverThread's run()", "Server starts to accept");
 					serverSocket.accept();			// Starts listening for incoming connection
-					handlingMessages(serverSocket, serverBuf, tvTop);
+					
+					// Wait for incoming message and display them in the TextView
+					displayIncomingMessages(serverSocket, serverBuf, tvTop);
 
 				} catch (IOException e) {
 					e.printStackTrace();
@@ -122,14 +136,17 @@ public class Chat extends Activity{
 			public void run() {
 				Log.d("clientThread's run()","clientThread creates a new TCP stack with the address 192.168.0."+clientIP);
 				try {
-					clientStack = new TCP(clientIP);
-					clientSocket = clientStack.socket();
+					clientStack = new TCP(clientIP);		// Creating a new TCP stack
+					clientSocket = clientStack.socket();		// Create the client's socket
 					Log.d("clientThread's run()", "Client tries to connect on 192.168.0."+serverIP);
+					
+					// Try to connect to the serve
 					if (!clientSocket.connect(IpAddress.getAddress("192.168.0."+serverIP), serverPort)){
 						Log.e("clientThread","Unable to connect");
 						return;
 					}
-					handlingMessages(clientSocket, clientBuf, tvBottom);
+					// Wait for incoming message and display them in the TextView
+					displayIncomingMessages(clientSocket, clientBuf, tvBottom);
 
 				} catch (IOException e) {
 					e.printStackTrace();
@@ -137,30 +154,42 @@ public class Chat extends Activity{
 			}
 		});
 
+		// Start the threads
 		Log.d("onCreate()", "threadServ starts");
 		serverThread.start();
+		
 		Log.d("onCreate()", "threadClient starts");
 		clientThread.start();
 
 	}
 
-	private void handlingMessages(Socket soc, byte[] buf, final TextView tv){
+	/**
+	 * Receive a message and display it in the TextView. It also takes care of the scroll, if already
+	 * too many messages have been received and displayed. 
+	 * 
+	 * @param soc	The socket of the calling thread
+	 * @param buf	The buffer of the calling thread
+	 * @param tv	The TextView object associated to the calling thread
+	 */
+	private void displayIncomingMessages(Socket soc, byte[] buf, final TextView tv){
 		int n;
 		// if it receives a message, converts it into a string and display in the TextView
 		while((n = soc.read(buf, 0, maxlen)) > 0){
 			final String messageReceived = new String(buf, 0, n);
-			Log.d("Thread ", "Received message: "+messageReceived);
+			Log.d("handlingMessages()", "Received message: "+messageReceived);
+			
 			// To be able to modify the TextView. Only the thread which created a view can modify it.
-			// Here the main thread created tvTop, so we do that to allow serverThread to change it.
+			// Here the main thread created tvTop, so we do that to allow server/clientThread to change it.
 			runOnUiThread(new Runnable() {
 				public void run() {
 					tv.append(messageReceived+"\n");
-					// find the amount we need to scroll. This works by
-				    // asking the TextView's internal layout for the position
-				    // of the final line and then subtracting the TextView's height
+					
+					// Find the amount we need to scroll. This works by asking the TextView's internal
+					// layout for the position of the final line and then subtracting the TextView's height.
 					final int scrollAmount = tv.getLayout().getLineTop(tv.getLineCount())-
 							tv.getHeight();
-				    // if there is no need to scroll, scrollAmount will be <=0
+				    
+					// if there is no need to scroll, scrollAmount will be <=0
 				    if (scrollAmount > 0)
 				    	tv.scrollTo(0, scrollAmount);
 				    else
