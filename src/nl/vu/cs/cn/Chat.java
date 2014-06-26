@@ -160,7 +160,7 @@ public class Chat extends Activity{
 	protected  void onPause() {
 		super.onPause();
 		serverSocket.close();
-		//clientSocket.close();
+		clientSocket.close();
 		finish();
 	}
 

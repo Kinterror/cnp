@@ -3,24 +3,28 @@
     android:layout_width="fill_parent"
     android:layout_height="fill_parent"
     android:orientation="vertical"
+    android:weightSum="100"
     android:padding="10dp" >
 
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:layout_weight="0.50"
+        android:layout_weight="50"
+        android:weightSum="100"
         android:orientation="vertical" >
 
         <TextView
             android:id="@+id/tvTop"
             android:layout_width="match_parent"
-            android:layout_height="158dp"
+            android:layout_height="match_parent"
+            android:layout_weight="80"
             android:hint="@string/incmsg" />
 
         <LinearLayout
             android:layout_width="fill_parent"
             android:layout_height="wrap_content"
             android:orientation="horizontal"
+            android:layout_weight="20"
             android:weightSum="5" >
 
             <EditText
@@ -44,19 +48,22 @@
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:layout_weight="0.50"
+        android:layout_weight="50"
+        android:weightSum="100"
         android:orientation="vertical" >
 
         <TextView
             android:id="@+id/tvBottom"
             android:layout_width="match_parent"
-            android:layout_height="158dp"
+            android:layout_height="match_parent"
+            android:layout_weight="80"
             android:hint="@string/incmsg" />
 
         <LinearLayout
             android:layout_width="fill_parent"
             android:layout_height="wrap_content"
             android:orientation="horizontal"
+            android:layout_weight="20"
             android:weightSum="5" >
 
             <EditText
