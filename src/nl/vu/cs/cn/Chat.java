@@ -6,6 +6,7 @@ import nl.vu.cs.cn.IP.IpAddress;
 import nl.vu.cs.cn.TCP.Socket;
 import android.app.Activity;
 import android.os.Bundle;
+import android.text.method.ScrollingMovementMethod;
 import android.util.Log;
 import android.view.View;
 import android.view.View.OnClickListener;
@@ -44,6 +45,8 @@ public class Chat extends Activity{
 		//The graphical items of the server
 		btnTop = (Button)findViewById(R.id.btnTop);
 		tvTop = (TextView)findViewById(R.id.tvTop);
+		tvTop.setMovementMethod(new ScrollingMovementMethod());
+
 		etTop = (EditText)findViewById(R.id.etTop);
 		btnTop.setOnClickListener(new OnClickListener() {
 
@@ -64,6 +67,7 @@ public class Chat extends Activity{
 		//The graphical items of the client
 		btnBottom = (Button)findViewById(R.id.btnBottom);
 		tvBottom = (TextView)findViewById(R.id.tvBottom);
+		tvBottom.setMovementMethod(new ScrollingMovementMethod());
 		etBottom = (EditText)findViewById(R.id.etBottom);
 		btnBottom.setOnClickListener(new OnClickListener() {
 
@@ -106,6 +110,12 @@ public class Chat extends Activity{
 						runOnUiThread(new Runnable() {
 							public void run() {
 								tvTop.append(messageReceived+"\n");
+								final int scrollAmount = tvTop.getLayout().getLineTop(tvTop.getLineCount()) - tvTop.getHeight();
+							    // if there is no need to scroll, scrollAmount will be <=0
+							    if (scrollAmount > 0)
+							    	tvTop.scrollTo(0, scrollAmount);
+							    else
+							    	tvTop.scrollTo(0, 0);
 							}
 						});
 					}
@@ -134,6 +144,12 @@ public class Chat extends Activity{
 						runOnUiThread(new Runnable() {
 							public void run() {
 								tvBottom.append(messageReceived+"\n");
+								final int scrollAmount = tvBottom.getLayout().getLineTop(tvBottom.getLineCount()) - tvBottom.getHeight();
+							    // if there is no need to scroll, scrollAmount will be <=0
+							    if (scrollAmount > 0)
+							    	tvBottom.scrollTo(0, scrollAmount);
+							    else
+							    	tvBottom.scrollTo(0, 0);
 							}
 						});
 					}
