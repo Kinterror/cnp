@@ -208,6 +208,22 @@ public class TCP {
 		}
 
 		/**
+		 * Sets the dest IP address right and calls send_tcp_segment().
+		 * @param pck
+		 */
+		private boolean sockSend(TCPSegment pck) {
+			SocketAddress remoteAddr = tcb.getRemoteSocketAddress();
+
+			try{
+				send_tcp_segment(remoteAddr.getIp(), pck);
+			} catch (IOException e) {
+				e.printStackTrace();
+				return false;
+			}
+			return true;
+		}
+
+		/**
 		 * waits for a segment to arrive. Checks the sequence number and ack number and resends lost acks.
 		 * @param timeout
 		 * @return the packet that was received.
@@ -228,6 +244,8 @@ public class TCP {
 					return pck;
 				} catch (InvalidPacketException e) {
 					Log.d("sockRecv", "Invalid packet: " + e.getMessage());
+				} catch (IOException e) {
+					Log.e("IP Receive Fail", "Failed receiving IP packet", e);
 				}
 			}    	
 		}
@@ -359,22 +377,6 @@ public class TCP {
 				Log.d("receiverThread", "received unexpected packet type: " + seg.getSegmentType().name());
 			}
 
-		}
-
-		/**
-		 * Sets the src and dest port right and calls send_tcp_segment().
-		 * @param pck
-		 */
-		private boolean sockSend(TCPSegment pck) {
-			SocketAddress remoteAddr = tcb.getRemoteSocketAddress();
-
-			try{
-				send_tcp_segment(remoteAddr.getIp(), pck);
-			} catch (IOException e) {
-				e.printStackTrace();
-				return false;
-			}
-			return true;
 		}
 
 		/**
@@ -518,6 +520,9 @@ public class TCP {
 					return false;
 				} catch (InvalidPacketException e1) {
 					Log.e("waitForSynack", "Invalid packet: " + e1.getMessage());
+				} catch (IOException e2){
+					Log.e("IP Receive Fail", "Failed receiving IP packet", e2);
+					e2.printStackTrace();
 				}
 			}
 		}
@@ -949,19 +954,14 @@ public class TCP {
 	 * @param timeout the timeout (seconds) to wait for a packet. If set to a value <= 0, it waits indefinitely.
 	 * @throws InterruptedException if the timeout expired
 	 * @throws InvalidPacketException if the packet is corrupted or has incorrect content
+	 * @throws IOException if the receiving fails
 	 */
-	TCPSegment recv_tcp_segment(int timeout) throws InvalidPacketException, InterruptedException{
+	TCPSegment recv_tcp_segment(int timeout) throws InvalidPacketException, InterruptedException, IOException{
 		Packet ip_packet = new Packet();
-		try {
-			if(timeout > 0){
-				ip.ip_receive_timeout(ip_packet, timeout);
-			} else {
-				ip.ip_receive(ip_packet);			
-			}
-		} catch (IOException e) {
-			Log.e("IP Receive Fail", "Failed receiving IP packet", e);
-			e.printStackTrace();
-			return null;
+		if(timeout > 0){
+			ip.ip_receive_timeout(ip_packet, timeout);
+		} else {
+			ip.ip_receive(ip_packet);			
 		}
 
 		//hexdump the packet for debugging
