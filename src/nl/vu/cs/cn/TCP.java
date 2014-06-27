@@ -176,6 +176,7 @@ public class TCP {
 					{
 						//initialize the tcb with the right sequence numbers, ports and IP addresses
 						tcb.initServer(syn_pck);
+						tcb.generateSeqnr();
 						tcb.setState(ConnectionState.S_SYN_RCVD);
 					} else {
 						//else, discard it and listen again.

@@ -188,6 +188,8 @@ class TCPSegment{
 			
 			seq_nr |= (temp<<shift);
 		}
+		//wrap seqnr
+		seq_nr = seq_nr % (TCPControlBlock.UINT_32_MAX + 1);
 		
 		//acknr
 		long ack_nr = 0;
@@ -195,6 +197,8 @@ class TCPSegment{
 			//here be dragons
 			ack_nr |= ((long) (array[i]) & 0xFF) <<(24 - 8 * (i - 8));
 		}
+		//wrap acknr
+		ack_nr = ack_nr % (TCPControlBlock.UINT_32_MAX + 1);
 		
 		//offset, reserved and ns flag
 		byte offset = (byte) ((array[12] & 0xF0) >>4);

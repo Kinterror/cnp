@@ -118,7 +118,7 @@ public class TCPWithPacketLoss {
 			tcb.setRemoteSocketAddress(new SocketAddress(dst, port));
 
 			//generate sequence number
-			tcb.generateSeqnr();
+			tcb.generateSeqnr(TCPControlBlock.UINT_32_MAX - 1);
 
 			//construct a syn packet
 			TCPSegment syn_pck = tcb.createControlSegment(TCPSegmentType.SYN);
@@ -188,6 +188,7 @@ public class TCPWithPacketLoss {
 					{
 						//initialize the tcb with the right sequence numbers, ports and IP addresses
 						tcb.initServer(syn_pck);
+						tcb.generateSeqnr(TCPControlBlock.UINT_32_MAX - 3);
 						tcb.setState(ConnectionState.S_SYN_RCVD);
 					} else {
 						//else, discard it and listen again.

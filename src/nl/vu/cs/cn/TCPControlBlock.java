@@ -15,7 +15,7 @@ import nl.vu.cs.cn.TCPSegment.TCPSegmentType;
 class TCPControlBlock{
 	
 	/**maximum value of uint32 for sequence numbers*/
-	private static final long UINT_32_MAX = (2 * ((long) Integer.MAX_VALUE) + 1);
+	static final long UINT_32_MAX = (2 * ((long) Integer.MAX_VALUE) + 1);
 	
 	/**random number generator for sequence numbers*/
 	private Random rand;
@@ -63,9 +63,8 @@ class TCPControlBlock{
 		//update connection source
 		setRemoteSocketAddress(s.getSrcSocketAddress());
 		//generate sequence number and update state and acknowledgment number.
-		generateSeqnr();
 		previous_acknr = s.seq_nr;
-		current_acknr = s.seq_nr + 1;
+		current_acknr = (s.seq_nr + 1) % (UINT_32_MAX + 1);
 	}
 	
 	/**
@@ -74,7 +73,7 @@ class TCPControlBlock{
 	 */
 	void initClient(TCPSegment s){
 		previous_acknr = s.seq_nr;
-		current_acknr = s.seq_nr + 1;
+		current_acknr = (s.seq_nr + 1) % (UINT_32_MAX + 1);
 	}
 	
 	/**
@@ -127,9 +126,18 @@ class TCPControlBlock{
 	 * @return the sequence number
 	 */
 	long generateSeqnr(){
-		current_seqnr = Math.abs(rand.nextLong() % UINT_32_MAX);
+		current_seqnr = Math.abs(rand.nextLong() % (UINT_32_MAX + 1));
 		previous_seqnr = 0;
 		return current_seqnr;
+	}
+	
+	/**
+	 * generates a new sequence number set to a predefined value instead of random.
+	 */
+	long generateSeqnr(long seqnr){
+		current_seqnr = Math.abs(seqnr) % (UINT_32_MAX + 1);
+		previous_seqnr = 0;
+		return seqnr;
 	}
 	
 	/**
@@ -139,7 +147,7 @@ class TCPControlBlock{
 	 */
 	long getAndIncrementSeqnr(long size){
 		previous_seqnr = current_seqnr;
-		current_seqnr = (current_seqnr + size) % UINT_32_MAX;
+		current_seqnr = (current_seqnr + size) % (UINT_32_MAX + 1);
 		//this sequence number never becomes negative
 		
 		return previous_seqnr;
@@ -152,7 +160,7 @@ class TCPControlBlock{
 	 */
 	long getAndIncrementAcknr(long size){
 		previous_acknr = current_acknr;
-		current_acknr = (current_acknr + size) % UINT_32_MAX;
+		current_acknr = (current_acknr + size) % (UINT_32_MAX + 1);
 		return previous_acknr;
 	}
 
