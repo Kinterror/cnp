@@ -233,11 +233,11 @@ class TCPControlBlock{
 	
 	/**
 	 * generates an ACK packet which acknowledges the packet specified by pck.
-	 * This method does not increase the sequence number of the TCB.
+	 * This method does not increase the sequence/ack number of the TCB.
 	 * @param pck
 	 * @return the new ACK packet
 	 */
 	TCPSegment generateAck(TCPSegment pck){
-		return new TCPSegment(local_port, remote_port, pck.ack_nr, pck.seq_nr + (pck.data.length > 0 ? pck.data.length : 1), TCPSegmentType.ACK, new byte[0]);
+		return new TCPSegment(local_port, remote_port, current_seqnr, pck.seq_nr + (pck.data.length > 0 ? pck.data.length : 1), TCPSegmentType.ACK, new byte[0]);
 	}
 }
