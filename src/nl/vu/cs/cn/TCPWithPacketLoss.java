@@ -94,6 +94,18 @@ public class TCPWithPacketLoss {
 			recv_buf = new BoundedByteBuffer(BUFFER_SIZE);
 			send_buf = new BoundedByteBuffer(BUFFER_SIZE);
 		}
+		
+		/**
+		 * initialize the socket. 
+		 * Mainly used in accept or connect to prevent reused sockets to interfere with the previous connection. 
+		 */
+		private void init(){
+			send_buf.init();
+			recv_buf.init();
+			closePending = false;
+			isWaitingForAck = false;
+			hasFailed = false;
+		}
 
 		/**
 		 * Connect this socket to the specified destination and port.
@@ -111,8 +123,7 @@ public class TCPWithPacketLoss {
 				return false;
 			}
 
-			send_buf.init();
-			recv_buf.init();
+			init();
 
 			// Implement the connection side of the three-way handshake here.
 			tcb.setRemoteSocketAddress(new SocketAddress(dst, port));
@@ -152,8 +163,6 @@ public class TCPWithPacketLoss {
 		 */
 		public boolean accept() {
 
-			hasFailed = false;
-			
 			//client sockets and sockets with an already open connection cannot call accept
 			if(isClientSocket){
 				Log.e("accept() error","Called accept() on a client socket");
@@ -163,8 +172,7 @@ public class TCPWithPacketLoss {
 				return false;
 			}
 
-			send_buf.init();
-			recv_buf.init();
+			init();
 
 			//receive incoming packets
 			while (tcb.getState() != ConnectionState.S_ESTABLISHED){
@@ -816,6 +824,8 @@ public class TCPWithPacketLoss {
 				hasFailed = true;
 				tcb.setState(ConnectionState.S_CLOSED);
 			}
+			
+			closePending = false;
 		}
 		
 		/**
@@ -865,7 +875,7 @@ public class TCPWithPacketLoss {
 				{ 
 					try {
 						//just receive packets and handle them accordingly
-						TCPSegment seg = sockRecv(100);
+						TCPSegment seg = sockRecv(10);
 						handlePacket(seg);
 					} catch (InterruptedException e) {
 						//continue

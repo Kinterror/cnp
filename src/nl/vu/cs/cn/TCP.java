@@ -69,8 +69,6 @@ public class TCP {
 		private Socket() {
 			this(DEFAULT_CLIENT_PORT);
 			isClientSocket = true;
-			closePending = false;
-			isWaitingForAck = false;
 		}
 
 		/**
@@ -85,6 +83,17 @@ public class TCP {
 
 			recv_buf = new BoundedByteBuffer(BUFFER_SIZE);
 			send_buf = new BoundedByteBuffer(BUFFER_SIZE);
+		}
+		
+		/**
+		 * initialize the socket. 
+		 * Mainly used in accept or connect to prevent reused sockets to interfere with the previous connection. 
+		 */
+		private void init(){
+			send_buf.init();
+			recv_buf.init();
+			closePending = false;
+			isWaitingForAck = false;
 		}
 
 		/**
@@ -101,8 +110,7 @@ public class TCP {
 				return false;
 			}
 
-			send_buf.init();
-			recv_buf.init();
+			init();
 
 			// Implement the connection side of the three-way handshake here.
 			tcb.setRemoteSocketAddress(new SocketAddress(dst, port));
@@ -151,8 +159,7 @@ public class TCP {
 				System.exit(-1);
 			}
 
-			send_buf.init();
-			recv_buf.init();
+			init();
 
 			//receive incoming packets
 			while (tcb.getState() != ConnectionState.S_ESTABLISHED){
@@ -799,6 +806,8 @@ public class TCP {
 				//if we fail to receive a fin ack, force close
 				tcb.setState(ConnectionState.S_CLOSED);
 			}
+			
+			closePending = false;
 		}
 		
 		/**
@@ -848,7 +857,7 @@ public class TCP {
 				{ 
 					try {
 						//just receive packets and handle them accordingly
-						TCPSegment seg = sockRecv(100);
+						TCPSegment seg = sockRecv(10);
 						handlePacket(seg);
 					} catch (InterruptedException e) {
 						//continue
