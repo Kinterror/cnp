@@ -368,7 +368,7 @@ public class TCP {
 					//also process the fin flag
 					break;
 				}
-				//else handle the fin flag
+				//handle the fin flag
 			case FIN:
 				//go to appropriate state of the connection termination and ack the fin
 				handleIncomingFin(seg);
@@ -388,9 +388,8 @@ public class TCP {
 				isWaitingForAck = true;
 				do {
 					sockSend(pck);
-					/*there's an innocent race condition here that makes us lose one second
-					 * if this thread gets preempted here and the receive thread receives the
-					 * packet and calls notify before this thread has entered wait state.
+					/* there's a race condition here if this thread gets preempted here and the receive thread receives the packet and calls notify before this thread has entered wait state. 
+					 * This way, the thread would never be notified of the ack. To prevent this, all this code is synchronized on the waitingForAckMonitor object.
 					 */
 					try {
 						//wait until the receiver thread receives an ack
@@ -422,9 +421,6 @@ public class TCP {
 				case SYNACK:
 					hasReceived = waitForAckToSynAck();
 					break;
-//				case FIN:
-//					hasReceived = waitForAckToFin();
-//					break;
 				default:
 					return false;
 				}
