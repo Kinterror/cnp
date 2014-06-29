@@ -153,10 +153,10 @@ public class TCP {
 			//client sockets and sockets with an already open connection cannot call accept
 			if(isClientSocket){
 				Log.e("accept() error","Called accept() on a client socket");
-				System.exit(-1);
+				return;
 			} else if (tcb.getState() != ConnectionState.S_CLOSED){
 				Log.e("accept() error","Called accept() on an opened socket");
-				System.exit(-1);
+				return;
 			}
 
 			init();
@@ -468,8 +468,9 @@ public class TCP {
 						handleIncomingFin(seg);
 
 						return true;
-					case ACK:
 					case DATA:
+						//now the ack was lost, but data was sent after that. Accept the in order data as an ACK.
+					case ACK:
 						tcb.setState(ConnectionState.S_ESTABLISHED);
 						return true;
 						/*

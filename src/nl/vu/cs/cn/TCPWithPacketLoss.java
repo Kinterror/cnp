@@ -484,8 +484,10 @@ public class TCPWithPacketLoss {
 						handleIncomingFin(seg);
 
 						return true;
-					case ACK:
+					
 					case DATA:
+						//now the ack was lost, but data was sent after that. Accept the in order data as an ACK.
+					case ACK:
 						tcb.setState(ConnectionState.S_ESTABLISHED);
 						return true;
 						/*
