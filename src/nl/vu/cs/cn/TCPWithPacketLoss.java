@@ -53,7 +53,7 @@ public class TCPWithPacketLoss {
 	 * The number starts at zero for the SYN (or synack in case of server) packet, and only concerns packets sent by this
 	 * tcp stack.
 	 */
-	private int[] lostPacketNumbers;
+	public int[] lostPacketNumbers;
 	
 	public boolean hasFailed;
 	
